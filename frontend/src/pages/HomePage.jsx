@@ -3,17 +3,19 @@
 import React from 'react';
 import Lanyard from '../components/Lanyard';
 import RotatingHeading from '../components/RotatingHeading';
-import Bg from '../components/Bg';
+// import Bg from '../components/Bg';
 
 export default function HomePage() {
   return (
-    <main className="relative w-full min-h-screen overflow-hidden">
+    <main className="relative w-full min-h-screen overflow-hidden"
+     style={{ backgroundImage: "url('/images/bg.png')" }}
+    >
       {/* 🔮 Animated Background */}
-      <Bg />
+      {/* <Bg /> */}
 
       {/* 🌑 Dark overlay */}
      {/* 🌑 Dark overlay with z-index and opacity */}
-<div className="absolute inset-0 bg-black/60 z-10" />
+<div className="absolute inset-0  z-10" />
 
 
       {/* 💘 Hero Section */}
@@ -21,13 +23,13 @@ export default function HomePage() {
         <div className="w-full md:w-1/2 h-full flex flex-col justify-center items-start px-8 md:px-16 text-white z-30">
           <RotatingHeading />
           <p className="mt-4 text-lg md:text-xl max-w-md animate-fade-in-up delay-200">
-            Join LoveLink — Where hearts meet, stories begin, and sparks fly.
+            Join AMORA— Where stories begin, and sparks fly.
           </p>
           <a
             href="/signup"
             className="mt-6 bg-pink-600 hover:bg-pink-500 transition px-6 py-3 rounded-full text-white font-bold text-lg shadow-lg hover:scale-105 animate-fade-in-up delay-400"
           >
-            Get Started 💘
+            Get Started
           </a>
         </div>
 
@@ -40,7 +42,7 @@ export default function HomePage() {
       <section className="w-full relative z-20 py-20 ">
         <div className="absolute w-full h-full top-0 left-0 z-0 heart-background animate-floating-hearts" />
         <div className="relative z-10 text-center space-y-6 px-4">
-          <h2 className="text-4xl font-bold text-pink-700">Why PataLo?</h2>
+          <h2 className="text-4xl font-bold text-pink-700">Why AMORA?</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mt-10">
             <FeatureCard
               img="https://cdn.dribbble.com/users/1894420/screenshots/14081986/dating_app.gif"

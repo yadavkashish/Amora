@@ -343,7 +343,7 @@ export default function CompatibilityForm({ userId }) {
 
         <button
           type="submit"
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700"
+          className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
         >
           Submit
         </button>

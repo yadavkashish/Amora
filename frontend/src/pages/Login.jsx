@@ -25,7 +25,7 @@ const handleSubmit = async (e) => {
     });
 
     if (res.ok) {
-      navigate('/form'); // redirect to form page
+      navigate('/dashboard'); // redirect to form page
     } else {
       const data = await res.json();
       alert(Object.values(data.errors || { error: data.error || 'Login failed' }).join('\n'));

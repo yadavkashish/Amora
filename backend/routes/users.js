@@ -15,3 +15,13 @@ router.get('/all', protect, async (req, res) => {
 });
 
 module.exports = router;
+
+//  {/* Profile picture */}
+//               <img
+//                 src={`http://localhost:5000/uploads/${match.profilePic}`}
+//                 alt="Profile"
+//                 onError={(e) => {
+//                   e.target.src = '/default-avatar.png';
+//                 }}
+//                 className="w-full h-56 object-cover rounded-t-lg"
+//               />

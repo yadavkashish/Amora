@@ -172,30 +172,33 @@ function Band({ maxSpeed = 50, minSpeed = 0 }) {
                       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                     }
                   `}
-                  fragmentShader={`
-                    varying vec3 vNormal;
-                    varying vec3 vWorldPosition;
+                 fragmentShader={`
+  varying vec3 vNormal;
+  varying vec3 vWorldPosition;
 
-                    void main() {
-                      float fresnel = pow(1.0 - dot(vNormal, normalize(vWorldPosition)), 3.0);
-                      vec3 iridescence = vec3(0.6, 0.8, 1.0) + vec3(1.0, 0.8, 0.6) * fresnel;
-                      gl_FragColor = vec4(iridescence, 0.25 + fresnel * 0.2);
-                    }
-                  `}
+  void main() {
+    float fresnel = pow(1.0 - dot(vNormal, normalize(vWorldPosition)), 3.0);
+    // deep crimson fresnel glow
+    vec3 iridescence = vec3(0.2, 0.0, 0.0) + vec3(1.0, 0.1, 0.1) * fresnel;
+    gl_FragColor = vec4(iridescence, 0.25 + fresnel * 0.3);
+  }
+`}
+
                 />
               </mesh>
-              <mesh
-                geometry={nodes.Heart_Heart_0.geometry}
-                material={new THREE.MeshStandardMaterial({
-                  color: '#ff3366',
-                  emissive: '#ff99aa',
-                  emissiveIntensity: 2,
-                  roughness: 0.5,
-                  metalness: 0.6
-                })}
-                castShadow
-                receiveShadow
-              />
+            <mesh geometry={nodes.Heart_Heart_0.geometry}>
+  <meshStandardMaterial
+    color={'#8B0000'}          // Dark red base (visible)
+   emissive={'#FF0000'}       // Pure red emissive (glows properly)
+    emissiveIntensity={5}    // Boost glow so it isn’t washed out
+    roughness={0.25}           // Make it shinier
+    metalness={0.7}            // Reflect background light
+  />
+</mesh>
+
+
+
+
               <mesh
   geometry={nodes.Marble_Marble_0.geometry}
    scale={1.2} 

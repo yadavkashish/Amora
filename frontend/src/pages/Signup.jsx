@@ -36,28 +36,31 @@ const Signup = () => {
   };
 
   // STEP 2: Verify OTP & Create Account
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ ...formData, otp }),
-});
+const handleVerifyOtp = async (e) => {
+  e.preventDefault();
+  try {
+    const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // 🔑 ensures cookie gets stored
+      body: JSON.stringify({ ...formData, otp }),
+    });
 
+    const data = await response.json();
 
-      if (response.ok) {
-        alert('🎉 Account created successfully!');
-        navigate('/login');
-      } else {
-        const data = await response.json();
-        alert('⚠️ ' + (data.message || 'Invalid OTP or registration error'));
-      }
-    } catch (err) {
-      console.error('❌ Error verifying OTP:', err);
-      alert('❌ Failed to connect to server');
+    if (response.ok) {
+      alert(data.message);
+      navigate("/compatibilityform"); // ✅ no login step needed
+    } else {
+      alert("⚠️ " + (data.error || "Invalid OTP or registration error"));
     }
-  };
+  } catch (err) {
+    console.error("❌ Error verifying OTP:", err);
+    alert("❌ Failed to connect to server");
+  }
+};
+
+
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">

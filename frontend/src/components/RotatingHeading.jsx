@@ -7,10 +7,10 @@ export default function RotatingHeading() {
   return (
     <RotatingText
       texts={[
-        'Find Your ❤️ Match',
-        'Swipe. Match. Date.',
-        'Love Awaits 💘',
-        'PataLo Hai Na!',
+        'Find Your Connection',
+        'Vibe. Match.Enjoy .',
+        'Life Awaits 💘',
+        'AMORA Hai Na!',
       ]}
       mainClassName="text-5xl md:text-6xl font-bold drop-shadow-lg animate-fade-in-up"
       staggerFrom="center"

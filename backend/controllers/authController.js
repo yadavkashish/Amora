@@ -47,24 +47,36 @@ exports.verifyOtpAndRegister = async (req, res) => {
     if (!name || !email || !password || !otp)
       return res.status(400).json({ error: "All fields are required" });
 
+    // 🔑 Verify OTP
     const record = await Otp.findOne({ email, otp });
     if (!record)
       return res.status(400).json({ error: "Invalid or expired OTP" });
 
+    // 🔑 Prevent duplicate email
     const userExists = await User.findOne({ email });
     if (userExists)
       return res.status(400).json({ error: "Email already exists" });
 
-    // ✅ Ensure password gets hashed by pre-save hook
+    // ✅ Create new user (password hashed by pre-save hook in User model)
     const user = new User({ name, email, password });
     await user.save();
 
+    // 🔑 Clean up OTPs for this email
     await Otp.deleteMany({ email });
 
+    // ✅ Generate JWT
     const token = createToken(user._id);
-    res.cookie("token", token, cookieOptions);
+
+    // ✅ Send cookie like in login
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
     res.status(201).json({
-      message: "Account created successfully",
+      message: "🎉 Account created & logged in successfully",
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
@@ -72,6 +84,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     res.status(500).json({ error: "Server error during registration" });
   }
 };
+
 
 
 // ✅ Forgot Password: Send OTP
