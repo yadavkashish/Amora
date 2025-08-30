@@ -1,9 +1,8 @@
 'use client';
+
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from 'react-router-dom';
-
-
 
 const questions = [
   {
@@ -240,14 +239,17 @@ const questions = [
   },
 ];
 
-export default function CompatibilityForm({ userId }) {
+export default function CompatibilityForm() {
   const [answers, setAnswers] = useState({});
   const [dealbreakers, setDealbreakers] = useState({
     kids: false,
     monogamy: false,
     religion: false,
   });
+
+  const API_URL = import.meta.env.VITE_API_URL;
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
 
   const handleAnswerChange = (qId, value) => {
     setAnswers({ ...answers, [qId]: parseInt(value) });
@@ -259,18 +261,17 @@ export default function CompatibilityForm({ userId }) {
       [e.target.name]: e.target.checked,
     });
   };
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await axios.post(
-        "http://localhost:5000/api/compatibility/submit",
-        { answers, dealbreakers }, // ✅ no userId
-        { withCredentials: true }  // ✅ send JWT cookie
+        `${API_URL}/api/compatibility/submit`,
+        { answers, dealbreakers },
+        { withCredentials: true }
       );
       setMessage("✅ Your answers have been saved!");
-       navigate('/profileform');
+      navigate('/profileform');
     } catch (err) {
       console.error("❌ Error saving answers:", err.response?.data || err.message);
       setMessage("❌ Error saving answers");
@@ -278,19 +279,20 @@ export default function CompatibilityForm({ userId }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-xl">
-      <h2 className="text-2xl font-bold mb-6 text-center">
+    <div className="max-w-3xl pt-23  mx-auto p-6 bg-white shadow-lg rounded-xl">
+      <h2 className="text-2xl font-bold mb-6 text-center text-pink-600">
         Compatibility Quiz
       </h2>
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {questions.map((q, idx) => (
-          <div key={q.id} className="p-4 border rounded-lg bg-gray-50">
-            <p className="font-medium mb-3">
+          <div key={q.id} className="p-4 border rounded-lg bg-gray-50 shadow-sm">
+            <p className="font-medium mb-3 text-gray-800">
               {idx + 1}. {q.text}
             </p>
             <div className="space-y-2">
               {q.options.map((opt, i) => (
-                <label key={i} className="block">
+                <label key={i} className="block cursor-pointer">
                   <input
                     type="radio"
                     name={q.id}
@@ -308,7 +310,7 @@ export default function CompatibilityForm({ userId }) {
 
         {/* Dealbreaker Section */}
         <div className="p-4 border rounded-lg bg-gray-100">
-          <p className="font-medium mb-3">Dealbreakers (optional):</p>
+          <p className="font-medium mb-3 text-gray-800">Dealbreakers (optional):</p>
           <label className="block">
             <input
               type="checkbox"
@@ -343,12 +345,12 @@ export default function CompatibilityForm({ userId }) {
 
         <button
           type="submit"
-          className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+          className="w-full bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition"
         >
           Submit
         </button>
 
-        {message && <p className="mt-4 text-center">{message}</p>}
+        {message && <p className="mt-4 text-center text-gray-700">{message}</p>}
       </form>
     </div>
   );

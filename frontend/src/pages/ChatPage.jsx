@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -6,79 +8,82 @@ import ChatWindow from "../components/ChatWindow";
 import { getSocket } from "../utils/socket";
 
 export default function ChatPage() {
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const { userId } = useParams(); // 👈 get userId from route
-  const socket = getSocket();
+  const { userId } = useParams(); // Optional userId param for direct chat
+  const [users, setUsers] = useState([]); // Chat list users
+  const [selectedUser, setSelectedUser] = useState(null); // Current chat
+  const [currentUserId, setCurrentUserId] = useState(null); // Logged-in user ID
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768); // Mobile detection
+  const API_URL = import.meta.env.VITE_API_URL; // Base API URL
+  const socket = getSocket(); // Socket instance
 
+  // Handle window resize
   useEffect(() => {
-    // ✅ Get logged-in user
-    axios
-      .get("http://localhost:5000/api/auth/me", { withCredentials: true })
-      .then(res => {
-        console.log("👤 Auth response:", res.data);
-        if (res.data?.user?._id) {
-          setCurrentUserId(res.data.user._id);
-          console.log("✅ Current User ID set to:", res.data.user._id);
-        } else {
-          console.warn("⚠️ No user ID found in auth response");
-        }
-      })
-      .catch(err => {
-        console.error("❌ Failed to fetch /auth/me:", err);
-      });
-
-    // ✅ Fetch chat list
-    axios
-      .get("http://localhost:5000/api/messages", { withCredentials: true })
-      .then(res => {
-        setUsers(res.data);
-        console.log("💬 Messages fetched:", res.data);
-      })
-      .catch(err => {
-        console.error("❌ Failed to fetch messages:", err);
-      });
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ✅ Auto-select user if navigated from dashboard
+  // Fetch logged-in user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true });
+        setCurrentUserId(res.data.user?._id || null);
+      } catch (err) {
+        console.error("Error fetching current user:", err);
+      }
+    };
+    fetchCurrentUser();
+  }, [API_URL]);
+
+  // Fetch chat list (users)
+  useEffect(() => {
+  // Define async function inside useEffect
+  const fetchChatList = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/messages`, { withCredentials: true });
+      setUsers(res.data);
+      console.log("💬 Messages fetched:", res.data);
+    } catch (err) {
+      console.error("❌ Error fetching chat list:", err);
+    }
+  };
+
+  fetchChatList(); // call the function
+}, [API_URL]); // runs when API_URL changes
+
+  // Handle direct navigation via userId param
   useEffect(() => {
     if (!userId) return;
 
-    const existing = users.find(u => u._id === userId);
-    if (existing) {
-      setSelectedUser(existing);
-    } else {
-      axios
-        .get(`http://localhost:5000/api/profile/user/${userId}`, {
-          withCredentials: true,
-        })
-        .then(res => {
-          const profile = res.data;
-          const newUser = {
-            _id: profile.user._id,
-            name: profile.user.name,
-            profilePic: profile.profilePic,
-          };
+    const fetchUserProfile = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/profile/user/${userId}`, { withCredentials: true });
+        const profile = res.data;
+        const newUser = {
+          _id: profile.user._id,
+          name: profile.user.name,
+          profilePic: profile.profilePic,
+        };
+        setUsers(prev => prev.some(u => u._id === newUser._id) ? prev : [...prev, newUser]);
+        setSelectedUser(newUser);
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+      }
+    };
 
-          setUsers(prev => {
-            const exists = prev.some(u => u._id === newUser._id);
-            return exists ? prev : [...prev, newUser];
-          });
+    fetchUserProfile();
+  }, [userId, API_URL]);
 
-          setSelectedUser(newUser);
-        })
-        .catch(err => {
-          console.error("❌ Failed to fetch profile:", err);
-        });
-    }
-  }, [userId, users]);
-
-  // ✅ Handle socket new messages
+  // Join socket room for current user
   useEffect(() => {
-    socket.on("newMessage", msg => {
-      console.log("📩 New message via socket:", msg);
+    if (!currentUserId) return;
+    socket.emit("join", String(currentUserId));
+  }, [currentUserId, socket]);
 
+  // Update chat list on new messages
+  useEffect(() => {
+    const handleNewMessage = (msg) => {
       setUsers(prev =>
         prev.map(u =>
           u._id === msg.sender || u._id === msg.receiver
@@ -86,43 +91,71 @@ export default function ChatPage() {
             : u
         )
       );
-    });
-
-    return () => socket.off("newMessage");
+    };
+    socket.on("newMessage", handleNewMessage);
+    return () => socket.off("newMessage", handleNewMessage);
   }, [socket]);
 
-  // ✅ Join socket room when user ID is ready
-  useEffect(() => {
-    if (currentUserId) {
-      console.log("🔌 Joining socket room:", currentUserId);
-      socket.emit("join", String(currentUserId));
-    }
-  }, [currentUserId, socket]);
-
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
-      {/* Sidebar */}
-      <Chats
-        users={users}
-        currentUserId={currentUserId}
-        selectedUserId={selectedUser?._id}
-        onSelectUser={setSelectedUser}
-      />
+    <div className="h-screen pt-21 flex bg-gray-50">
 
-      {/* Main chat */}
-      <main className="flex-1 h-full flex flex-col">
-        {currentUserId === null ? (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            Loading...
-          </div>
-        ) : selectedUser ? (
-          <ChatWindow selectedUser={selectedUser} currentUserId={currentUserId} />
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            Select a chat to start messaging
-          </div>
-        )}
-      </main>
+      {/* Desktop layout */}
+      {!isMobile && (
+        <>
+          <aside className="w-72 border-r border-gray-200 bg-white overflow-y-auto">
+            <Chats
+              users={users}
+              currentUserId={currentUserId}
+              selectedUserId={selectedUser?._id}
+              onSelectUser={setSelectedUser}
+            />
+          </aside>
+
+          <main className="flex-1 flex flex-col overflow-x-hidden">
+            {currentUserId === null ? (
+              <div className="flex-1 flex items-center justify-center text-gray-400">
+                Loading...
+              </div>
+            ) : selectedUser ? (
+              <ChatWindow
+                selectedUser={selectedUser}
+                currentUserId={currentUserId}
+                API_URL={API_URL}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-400 px-4">
+                Select a chat to start messaging
+              </div>
+            )}
+          </main>
+        </>
+      )}
+
+      {/* Mobile layout */}
+      {isMobile && (
+        <main className="flex-1 flex flex-col overflow-x-hidden">
+          {currentUserId === null ? (
+            <div className="flex-1 flex items-center justify-center text-gray-400">
+              Loading...
+            </div>
+          ) : selectedUser ? (
+            <ChatWindow
+              selectedUser={selectedUser}
+              currentUserId={currentUserId}
+              API_URL={API_URL}
+              onBack={() => setSelectedUser(null)}
+            />
+          ) : (
+            <Chats
+              users={users}
+              currentUserId={currentUserId}
+              selectedUserId={selectedUser?._id}
+              onSelectUser={setSelectedUser}
+            />
+          )}
+        </main>
+      )}
+
     </div>
   );
 }

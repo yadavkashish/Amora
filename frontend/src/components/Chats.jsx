@@ -1,48 +1,81 @@
 import React from "react";
 import { relativeTime } from "../utils/time";
 
+/**
+ * Chats Component
+ * Displays a list of users with their last message and timestamp.
+ * Highlights the selected user and triggers a callback on user selection.
+ * 
+ * Props:
+ * - users: Array of user objects { _id, name, profilePic, lastMessage, unreadCount, timestamp }
+ * - currentUserId: ID of the current logged-in user
+ * - selectedUserId: ID of the currently selected chat user
+ * - onSelectUser: Callback function triggered when a user is clicked
+ */
 export default function Chats({ users, currentUserId, selectedUserId, onSelectUser }) {
   return (
-    <aside className="w-72 border-r border-gray-200 bg-white h-full flex flex-col">
-      <div className="px-4 py-3 border-b border-gray-200 sticky top-0 bg-white z-10">
-        <h1 className="text-lg font-semibold text-gray-900">Messages</h1>
+    <div className="h-full flex flex-col">
+
+      {/* Header */}
+      <div className="px-4 pt-5 pb-3 border-b border-gray-200 sticky top-0 bg-white z-10">
+        <h2 className="text-lg font-semibold">Chats</h2>
       </div>
+
+      {/* Chat list */}
       <div className="flex-1 overflow-y-auto">
+        {/* No chats message */}
         {users?.length === 0 ? (
-          <div className="p-6 text-sm text-gray-500">No chats yet. Start a conversation!</div>
+          <div className="p-6 text-sm text-gray-500">
+            No chats yet. Start a conversation!
+          </div>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {users.map((u) => (
+            {users.map((user) => (
               <li
-                key={u._id}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 ${selectedUserId === u._id ? "bg-gray-50" : "bg-white"}`}
-                onClick={() => onSelectUser(u)}
+                key={user._id}
+                onClick={() => onSelectUser(user)}
+                className={`
+                  flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50
+                  ${selectedUserId === user._id ? "bg-gray-50" : "bg-white"}
+                `}
               >
+                {/* User profile picture */}
                 <img
-                  src={u.profilePic ? `http://localhost:5000/uploads/${u.profilePic}` : "https://via.placeholder.com/80"}
-                  alt={u.name}
-                  className="w-12 h-12 rounded-full object-cover"
+                  src={
+                    user.profilePic
+                      ? `http://localhost:5000/uploads/${user.profilePic}`
+                      : "https://via.placeholder.com/80"
+                  }
+                  alt={user.name}
+                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                 />
+
+                {/* User info */}
                 <div className="min-w-0 flex-1">
+                  {/* Name and timestamp */}
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900 truncate">{u.name}</p>
-                    <span className="ml-2 text-[11px] text-gray-400">{u.timestamp ? relativeTime(u.timestamp) : ""}</span>
+                    <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                    <span className="ml-2 text-[11px] text-gray-400">
+                      {user.timestamp ? relativeTime(user.timestamp) : ""}
+                    </span>
                   </div>
-                <p
-  className={`text-sm truncate ${
-    u.unreadCount > 0 ? "font-bold text-gray-900" : "text-gray-500"
-  }`}
->
-  {u.lastMessage || "Start a conversation"}
-</p>
 
-
+                  {/* Last message */}
+                  <p
+                    className={`text-sm truncate ${
+                      user.unreadCount > 0
+                        ? "font-bold text-gray-900"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {user.lastMessage || "Start a conversation"}
+                  </p>
                 </div>
               </li>
             ))}
           </ul>
         )}
       </div>
-    </aside>
+    </div>
   );
 }

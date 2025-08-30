@@ -119,7 +119,7 @@ router.put("/seen/:otherUserId", async (req, res) => {
       { $set: { seen: true } }
     );
 
-    // 🔥 Notify sender that their messages are seen
+    //  Notify sender that their messages are seen
     const io = req.app.get("io");
     io.to(otherUserId.toString()).emit("seenMessage", {
       userId: currentUserId.toString()

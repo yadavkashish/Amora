@@ -14,12 +14,20 @@ const Signup = () => {
   // STEP 1: Request OTP
   const handleSignup = async (e) => {
     e.preventDefault();
+
+    
     try {
      const response = await fetch(`${API_URL}/api/auth/send-otp`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email: formData.email }),
 });
+
+if (!formData.email.endsWith('@kiet.edu')) {
+    alert('⚠️ Only emails ending with @kiet.edu are allowed');
+    return;
+  }
+
 
 
       if (response.ok) {
@@ -83,6 +91,7 @@ const handleVerifyOtp = async (e) => {
             className="backdrop-blur-md border-2 border-black rounded-xl shadow-lg p-6 w-full max-w-md"
           >
             <h2 className="text-2xl font-bold text-center mb-4 border-b-2 border-black pb-2">Sign Up</h2>
+            <h4 className="font-bold text-center pb-2">Use your college email only!!</h4>
 
             <input
               type="text"

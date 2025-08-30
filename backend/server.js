@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
-const compatibilityRoutes = require("./routes/compatibility");
 const http = require('http');
 const { Server } = require('socket.io');
 
@@ -13,8 +12,8 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 
 // Route imports
+const compatibilityRoutes = require("./routes/compatibility");
 const userRoutes = require('./routes/users');
-const formRoutes = require('./routes/form');
 const profileRoutes = require('./routes/profile');
 const authRoutes = require('./routes/auth');
 const messageRoutes = require('./routes/messages');
@@ -62,7 +61,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ✅ Routes
 app.use('/api/users', userRoutes);
-app.use('/api/form', formRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);

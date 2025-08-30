@@ -42,7 +42,7 @@ exports.getMessages = async (req, res) => {
         { sender: currentUserId, receiver: otherUserId },
         { sender: otherUserId, receiver: currentUserId },
       ],
-      deletedFor: { $nin: [currentUserId] }   // ✅ FIXED: user not in deletedFor array
+      deletedFor: { $nin: [currentUserId] }   
     }).sort({ timestamp: 1 });
 
     res.json(messages);
