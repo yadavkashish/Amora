@@ -106,7 +106,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
       );
       setMessages(prev => [...prev, res.data]);
       setNewMessage("");
-      socket.emit("sendMessage", res.data);
+      socket.emit("send-message", res.data);
     } catch (err) {
       console.error("❌ Sending message failed:", err);
     }
