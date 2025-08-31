@@ -121,6 +121,19 @@ export default function ViewProfile() {
           <p className="text-gray-500">{profile.location || 'Unknown Location'}</p>
           <p className="text-gray-600 italic">"{profile.bio || 'No bio yet'}"</p>
 
+          {/* Email */}
+          {profile.user?.email && (
+            <p className="text-gray-700">
+              📧{' '}
+              <a
+                href={`mailto:${profile.user.email}`}
+                className="font-medium underline hover:text-pink-600 transition"
+              >
+                {profile.user.email}
+              </a>
+            </p>
+          )}
+
           {/* Basic Info */}
           <div className="flex flex-wrap justify-center gap-6 text-gray-700 text-lg">
             <p><strong>Age:</strong> {profile.age}</p>
