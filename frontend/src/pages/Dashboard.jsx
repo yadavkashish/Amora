@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const BASE_URL = import.meta.env.VITE_API_URL; 
+const BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = `${BASE_URL}/api`;
 
 export default function Dashboard() {
@@ -89,13 +89,14 @@ export default function Dashboard() {
 
               {/* User Profile Picture */}
               <img
-                src={`${BASE_URL}/uploads/${match.profilePic}`}
+                src={match.profilePic || "/default-avatar.png"}
                 alt={match.name}
                 onError={(e) => {
                   e.target.src = "/default-avatar.png";
                 }}
                 className="w-full h-32 object-cover rounded-t-md"
               />
+
 
               {/* Card Content */}
               <div className="p-2">

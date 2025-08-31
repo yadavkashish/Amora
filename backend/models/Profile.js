@@ -23,9 +23,11 @@ const profileSchema = new mongoose.Schema(
     // Location (optional, since within campus)
     location: { type: String },
 
-    // Media
-    profilePic: { type: String, default: '' },
-    morePics: [{ type: String }],
+    // Media (now stored as cloud URLs + public ids)
+    profilePic: { type: String, default: '' }, // secure URL from Cloudinary
+    profilePicPublicId: { type: String, default: '' }, // cloudinary public_id for deletion
+    morePics: [{ type: String }], // array of secure URLs
+    morePicsPublicIds: [{ type: String }], // array of matching public_ids
   },
   { timestamps: true }
 );

@@ -140,10 +140,12 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
               <FiArrowLeft size={20} />
             </button>
           )}
-          <img
-            src={selectedUser.profilePic 
-              ? `${API_URL}/uploads/${selectedUser.profilePic}` 
-              : "https://via.placeholder.com/80"}
+         <img
+            src={
+              selectedUser.profilePic && selectedUser.profilePic.startsWith("http")
+                ? selectedUser.profilePic
+                : "https://via.placeholder.com/80"
+            }
             alt={selectedUser.name}
             className="w-10 h-10 rounded-full object-cover"
           />

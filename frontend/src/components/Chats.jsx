@@ -45,8 +45,8 @@ export default function Chats({ users, currentUserId, selectedUserId, onSelectUs
                 {/* User profile picture */}
                 <img
                   src={
-                    user.profilePic
-                      ? `${import.meta.env.VITE_API_URL}/uploads/${user.profilePic}`
+                    user.profilePic&& user.profilePic.startsWith("http")
+                      ? user.profilePic
                       : "https://via.placeholder.com/80"
                   }
                   alt={user.name}

@@ -1,47 +1,72 @@
+// routes/profile.js
 const express = require('express');
 const router = express.Router();
 const Profile = require('../models/Profile');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const cloudinary = require('../config/cloudinary'); // your existing config
 const { protect } = require('../middleware/auth');
 
-// Ensure uploads directory exists
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+// Use memory storage so we can stream buffer to Cloudinary
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Multer storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
-  },
-});
-const upload = multer({ storage });
+// Tolerant import for your helper util. It may export uploadBuffer or uploadToCloudinary.
+const uploadUtil = require('../utils/uploadToCloudinary');
+const uploadBuffer = uploadUtil.uploadBuffer || uploadUtil.uploadToCloudinary || uploadUtil.default || uploadUtil;
 
-/**
- * POST /api/profile/create
- * Create a profile for the logged-in user
- */
-/**
- * POST /api/profile/create
- * Create a profile for the logged-in user
+// Helper that tries common call signatures for uploadBuffer
+async function callUploadBuffer(buffer, folder) {
+  // Try the object-options signature first
+  try {
+    return await uploadBuffer(buffer, { folder });
+  } catch (err) {
+    // if failed, try the simpler (buffer, folder) signature
+    try {
+      return await uploadBuffer(buffer, folder);
+    } catch (err2) {
+      // rethrow original error to surface useful info
+      throw err;
+    }
+  }
+}
+
+/** POST /api/profile/create
+ *  Creates a profile and uploads files to Cloudinary
  */
 router.post(
-  "/create",
+  '/create',
   protect,
-  upload.fields([{ name: "profilePic" }, { name: "morePics" }]),
+  upload.fields([{ name: 'profilePic', maxCount: 1 }, { name: 'morePics' }]),
   async (req, res) => {
     try {
-      // ✅ Normalize interests
-      let interests = req.body.interests || req.body["interests[]"] || [];
+      // Normalize interests
+      let interests = req.body.interests || req.body['interests[]'] || [];
       if (!Array.isArray(interests)) interests = [interests];
       interests = interests.filter((i) => i && i.trim().length > 0);
 
-      // ✅ Create profile object
+      // Upload profilePic if provided
+      let profilePic = null;
+      let profilePicPublicId = null;
+      if (req.files?.profilePic?.[0]) {
+        const result = await callUploadBuffer(req.files.profilePic[0].buffer, 'amora/profilePics');
+        profilePic = result.secure_url || result.url;
+        profilePicPublicId = result.public_id || result.publicId || null;
+      }
+
+      // Upload morePics if provided (parallel)
+      let morePics = [];
+      let morePicsPublicIds = [];
+      if (req.files?.morePics?.length) {
+        const uploads = await Promise.all(
+          req.files.morePics.map((f) => callUploadBuffer(f.buffer, 'amora/morePics'))
+        );
+        uploads.forEach((u) => {
+          morePics.push(u.secure_url || u.url);
+          morePicsPublicIds.push(u.public_id || u.publicId || null);
+        });
+      }
+
       const profile = new Profile({
-        user: req.user._id, // attach logged-in user
+        user: req.user._id,
         name: req.body.name,
         age: req.body.age,
         gender: req.body.gender,
@@ -52,41 +77,27 @@ router.post(
         preference: req.body.preference,
         location: req.body.location,
         interests,
-        profilePic: req.files["profilePic"]
-          ? req.files["profilePic"][0].filename
-          : null,
-        morePics: req.files["morePics"]
-          ? req.files["morePics"].map((f) => f.filename)
-          : [],
+        // keep old field names: profilePic is now a URL string
+        profilePic,
+        profilePicPublicId,
+        morePics,
+        morePicsPublicIds,
       });
 
       await profile.save();
       res.status(201).json({ success: true, profile });
     } catch (err) {
-      console.error("❌ Profile creation error:", err);
-
-      // Send detailed error info to frontend
-      res.status(400).json({
-        success: false,
-        error: err.message,
-        details: err.errors || null,
-      });
+      console.error('❌ Profile creation error:', err);
+      res.status(400).json({ success: false, error: err.message });
     }
   }
 );
 
-
-
-/**
- * GET /api/profile/latest
- * Fetch the latest profile for the logged-in user
- */
+/** GET latest profile for logged-in user */
 router.get('/latest', protect, async (req, res) => {
   try {
     const latestProfile = await Profile.findOne({ user: req.user._id }).sort({ createdAt: -1 });
-    if (!latestProfile) {
-      return res.status(404).json({ error: 'No profiles found for this user' });
-    }
+    if (!latestProfile) return res.status(404).json({ error: 'No profiles found for this user' });
     res.json(latestProfile);
   } catch (error) {
     console.error('❌ Error fetching latest profile:', error);
@@ -94,10 +105,7 @@ router.get('/latest', protect, async (req, res) => {
   }
 });
 
-/**
- * GET /api/profile/all
- * Fetch all profiles for the logged-in user
- */
+/** GET all profiles of current user */
 router.get('/all', protect, async (req, res) => {
   try {
     const profiles = await Profile.find({ user: req.user._id }).sort({ createdAt: -1 });
@@ -107,11 +115,8 @@ router.get('/all', protect, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch user profiles' });
   }
 });
-/**
- * GET /api/profile/all-profiles
- * Fetch all profiles except the logged-in user
- */
-// Get all profiles except logged-in user, with filters
+
+/** GET all profiles except logged-in user (filters supported) */
 router.get('/all-profiles', protect, async (req, res) => {
   try {
     const { gender, branch, course, year, interest } = req.query;
@@ -134,12 +139,10 @@ router.get('/all-profiles', protect, async (req, res) => {
   }
 });
 
-// ✅ Put this ABOVE the '/:id' route
+/** GET profile by user id */
 router.get('/user/:userId', protect, async (req, res) => {
   try {
-    const profile = await Profile.findOne({ user: req.params.userId })
-      .populate('user', 'name email profilePic');
-
+    const profile = await Profile.findOne({ user: req.params.userId }).populate('user', 'name email profilePic');
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
     res.json(profile);
   } catch (err) {
@@ -148,13 +151,11 @@ router.get('/user/:userId', protect, async (req, res) => {
   }
 });
 
-// Keep this BELOW
+/** GET profile by profile id */
 router.get('/:id', protect, async (req, res) => {
   try {
     const profile = await Profile.findById(req.params.id);
-    if (!profile) {
-      return res.status(404).json({ error: 'Profile not found' });
-    }
+    if (!profile) return res.status(404).json({ error: 'Profile not found' });
     res.json(profile);
   } catch (error) {
     console.error('❌ Error fetching profile:', error);
@@ -162,72 +163,88 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-
-/**
- * PUT /api/profile/:id
- * Update a profile for the logged-in user
- */
+/** PUT /api/profile/:id - update profile (replace images on Cloudinary if needed) */
 router.put(
   '/:id',
   protect,
-  upload.fields([
-    { name: 'profilePic', maxCount: 1 },
-    { name: 'morePics', maxCount: 10 },
-  ]),
+  upload.fields([{ name: 'profilePic', maxCount: 1 }, { name: 'morePics', maxCount: 10 }]),
   async (req, res) => {
     try {
       const profile = await Profile.findById(req.params.id);
       if (!profile) return res.status(404).json({ error: 'Profile not found' });
+      if (profile.user.toString() !== req.user._id.toString()) return res.status(403).json({ error: 'Unauthorized' });
 
-      // Ownership check
-      if (profile.user.toString() !== req.user._id.toString())
-        return res.status(403).json({ error: 'Unauthorized' });
+      // Update simple fields
+      const fields = ['name', 'age', 'gender', 'bio', 'preference', 'location', 'branch', 'course', 'year'];
+      fields.forEach((f) => {
+        if (req.body[f] != null) profile[f] = req.body[f];
+      });
 
-      // Text fields
-      const { name, age, gender, bio, preference, location } = req.body;
+      // interests parsing
       let interests = req.body['interests[]'] || req.body.interests;
-
-      if (name) profile.name = name;
-      if (age) profile.age = age;
-      if (gender) profile.gender = gender;
-      if (bio) profile.bio = bio;
-      if (preference) profile.preference = preference;
-      if (location) profile.location = location;
-
       if (interests) {
         if (typeof interests === 'string') {
-          // Parse JSON or comma-separated
           try {
             interests = JSON.parse(interests);
           } catch {
-            interests = interests.split(',').map(i => i.trim());
+            interests = interests.split(',').map((s) => s.trim());
           }
         }
         profile.interests = Array.isArray(interests) ? interests : [interests];
       }
 
-      // Profile picture replacement
-      if (req.files.profilePic) {
-        if (profile.profilePic && fs.existsSync(path.join(uploadDir, profile.profilePic))) {
-          fs.unlinkSync(path.join(uploadDir, profile.profilePic));
+      // Replace profilePic if new one uploaded
+      if (req.files?.profilePic?.[0]) {
+        // delete old from Cloudinary if we have public id
+        if (profile.profilePicPublicId) {
+          try {
+            await cloudinary.uploader.destroy(profile.profilePicPublicId);
+          } catch (delErr) {
+            console.warn('⚠️ Failed to destroy old profilePic on Cloudinary:', delErr.message);
+          }
         }
-        profile.profilePic = req.files.profilePic[0].filename;
+        const up = await callUploadBuffer(req.files.profilePic[0].buffer, 'amora/profilePics');
+        profile.profilePic = up.secure_url || up.url;
+        profile.profilePicPublicId = up.public_id || up.publicId || null;
       }
 
-      // Handle morePics
+      // Handle morePics: client sends existingMorePics[] (URLs) to keep
       let existingPics = req.body['existingMorePics[]'] || req.body.existingMorePics || [];
-      if (!Array.isArray(existingPics)) existingPics = [existingPics];
+      if (!Array.isArray(existingPics)) existingPics = existingPics ? [existingPics] : [];
 
-      // Delete removed pics
-      profile.morePics.forEach(pic => {
-        if (!existingPics.includes(pic) && fs.existsSync(path.join(uploadDir, pic))) {
-          fs.unlinkSync(path.join(uploadDir, pic));
+      // Delete removed pics from Cloudinary (by comparing saved URLs)
+      // We'll map saved URLs -> publicIds using profile.morePicsPublicIds
+      const keepUrls = new Set(existingPics);
+      const urlsToKeep = [];
+      const publicIdsToKeep = [];
+      for (let i = 0; i < (profile.morePics || []).length; i++) {
+        const url = profile.morePics[i];
+        const pubId = (profile.morePicsPublicIds && profile.morePicsPublicIds[i]) || null;
+        if (keepUrls.has(url)) {
+          urlsToKeep.push(url);
+          publicIdsToKeep.push(pubId);
+        } else {
+          // delete from Cloudinary if public id exists
+          if (pubId) {
+            try {
+              await cloudinary.uploader.destroy(pubId);
+            } catch (err) {
+              console.warn('⚠️ Failed to destroy morePic on Cloudinary:', err.message);
+            }
+          }
         }
-      });
+      }
+      profile.morePics = urlsToKeep;
+      profile.morePicsPublicIds = publicIdsToKeep;
 
-      // Append new uploads
-      const uploadedPics = req.files.morePics ? req.files.morePics.map(f => f.filename) : [];
-      profile.morePics = [...existingPics, ...uploadedPics];
+      // Append newly uploaded morePics
+      if (req.files?.morePics?.length) {
+        const uploads = await Promise.all(req.files.morePics.map((f) => callUploadBuffer(f.buffer, 'amora/morePics')));
+        uploads.forEach((u) => {
+          profile.morePics.push(u.secure_url || u.url);
+          profile.morePicsPublicIds.push(u.public_id || u.publicId || null);
+        });
+      }
 
       await profile.save();
       res.status(200).json(profile);
@@ -237,9 +254,5 @@ router.put(
     }
   }
 );
-
-
-
-
 
 module.exports = router;

@@ -43,8 +43,9 @@ export default function ViewProfile() {
   }, [userId, API_URL]);
 
   /** Helper to generate image/video URLs */
-  const mediaURL = (filename) =>
-    filename ? `${API_URL}/uploads/${filename}` : '/default-avatar.png';
+  const mediaURL = (url) =>
+    url ? url : '/default-avatar.png';
+
 
   /** Loading state */
   if (loading) {

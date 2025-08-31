@@ -31,8 +31,8 @@ useEffect(() => {
   fetchProfile();
 }, []);
 
-  const imageURL = (filename) =>
-  filename ? `${API_URL}/uploads/${filename}` : '/default-avatar.png';
+  const imageURL = (url) => url || '/default-avatar.png';
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
