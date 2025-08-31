@@ -5,8 +5,9 @@ let socket = null;
 // Initialize socket only once
 export const getSocket = () => {
   if (!socket) {
-    socket = io("http://localhost:5000", {
+    socket = io(import.meta.env.VITE_API_URL, {
       withCredentials: true,
+      transports: ["websocket", "polling"], // ensures connection
     });
   }
   return socket;
