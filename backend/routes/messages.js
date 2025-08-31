@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
     // Get all messages involving this user
     const messages = await Message.find({
       $or: [{ sender: currentUserId }, { receiver: currentUserId }],
-      deletedFor: { $ne: currentUserId } // ✅ exclude deleted ones
+      deletedFor: { $ne: currentUserId } // exclude deleted ones
     }).sort({ timestamp: -1 });
 
     const userMap = {};
@@ -30,14 +30,15 @@ router.get('/', async (req, res) => {
       }
     });
 
-    // Get profile info for all the users we have chatted with
+    // Get profiles for all users we have chatted with
     const profiles = await Profile.find({ user: { $in: Object.keys(userMap) } })
       .populate('user', 'name');
 
     const chatList = await Promise.all(profiles.map(async profile => {
+      if (!profile.user) return null; // skip if user is null
+
       const userIdStr = profile.user._id.toString();
 
-      // Count unread messages from this user (only if not deleted)
       const unreadCount = await Message.countDocuments({
         sender: userIdStr,
         receiver: currentUserId,
@@ -49,13 +50,15 @@ router.get('/', async (req, res) => {
         _id: profile.user._id,
         name: profile.user.name,
         profilePic: profile.profilePic,
-        lastMessage: userMap[userIdStr]?.content,
-        timestamp: userMap[userIdStr]?.timestamp,
+        lastMessage: userMap[userIdStr]?.content || "",
+        timestamp: userMap[userIdStr]?.timestamp || null,
         unreadCount,
       };
     }));
 
-    res.json(chatList);
+    // Remove null entries caused by missing users
+    res.json(chatList.filter(chat => chat !== null));
+
   } catch (err) {
     console.error("Error fetching chat list:", err);
     res.status(500).json({ error: 'Failed to fetch chats' });
