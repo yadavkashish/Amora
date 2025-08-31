@@ -54,7 +54,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   useEffect(() => {
     if (!selectedUser) return;
     axios.put(
-      `${API_URL}api/messages/seen/${selectedUser._id}`,
+      `${API_URL}/api/messages/seen/${selectedUser._id}`,
       {},
       { withCredentials: true }
     ).then(() => {
