@@ -14,7 +14,10 @@ import { relativeTime } from "../utils/time";
  */
 export default function Chats({ users, currentUserId, selectedUserId, onSelectUser }) {
   return (
+
+
     <div className="h-full flex flex-col">
+      
 
       {/* Header */}
       <div className="px-4 pt-5 pb-3 border-b border-gray-200 sticky top-0 bg-white z-10">
@@ -43,7 +46,7 @@ export default function Chats({ users, currentUserId, selectedUserId, onSelectUs
                 <img
                   src={
                     user.profilePic
-                      ? `http://localhost:5000/uploads/${user.profilePic}`
+                      ? `${import.meta.env.VITE_API_URL}/uploads/${user.profilePic}`
                       : "https://via.placeholder.com/80"
                   }
                   alt={user.name}

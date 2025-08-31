@@ -20,7 +20,8 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const bottomRef = useRef(); // Ref to scroll to bottom
-  const socket = getSocket(); // Socket.io instance
+  const socket = getSocket();
+  // Socket.io instance
 
   // Track mobile view
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -53,7 +54,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   useEffect(() => {
     if (!selectedUser) return;
     axios.put(
-      `http://localhost:5000/api/messages/seen/${selectedUser._id}`,
+      `${API_URL}api/messages/seen/${selectedUser._id}`,
       {},
       { withCredentials: true }
     ).then(() => {
@@ -70,7 +71,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   /** Fetch chat messages from backend */
   useEffect(() => {
     if (!selectedUser) return;
-    axios.get(`http://localhost:5000/api/messages/${selectedUser._id}`, {
+    axios.get(`${API_URL}/api/messages/${selectedUser._id}`, {
       withCredentials: true,
     })
       .then(res => setMessages(res.data))
@@ -99,7 +100,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
 
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/messages/${selectedUser._id}`,
+        `${API_URL}/api/messages/${selectedUser._id}`,
         { content: newMessage },
         { withCredentials: true }
       );
@@ -115,7 +116,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   const handleDeleteMessage = async (id) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/messages/delete/${id}`,
+        `${API_URL}/api/messages/delete/${id}`,
         {},
         { withCredentials: true }
       );
@@ -141,7 +142,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
           )}
           <img
             src={selectedUser.profilePic 
-              ? `http://localhost:5000/uploads/${selectedUser.profilePic}` 
+              ? `${API_URL}/uploads/${selectedUser.profilePic}` 
               : "https://via.placeholder.com/80"}
             alt={selectedUser.name}
             className="w-10 h-10 rounded-full object-cover"

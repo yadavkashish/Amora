@@ -38,19 +38,18 @@ export default function ChatPage() {
 
   // Fetch chat list (users)
   useEffect(() => {
-  // Define async function inside useEffect
-  const fetchChatList = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/messages`, { withCredentials: true });
-      setUsers(res.data);
-      console.log("💬 Messages fetched:", res.data);
-    } catch (err) {
-      console.error("❌ Error fetching chat list:", err);
-    }
-  };
+    const fetchChatList = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/messages`, { withCredentials: true });
+        setUsers(res.data);
+        console.log("💬 Messages fetched:", res.data);
+      } catch (err) {
+        console.error("❌ Error fetching chat list:", err);
+      }
+    };
 
-  fetchChatList(); // call the function
-}, [API_URL]); // runs when API_URL changes
+    fetchChatList();
+  }, [API_URL]);
 
   // Handle direct navigation via userId param
   useEffect(() => {
@@ -66,7 +65,7 @@ export default function ChatPage() {
           profilePic: profile.profilePic,
         };
         setUsers(prev => prev.some(u => u._id === newUser._id) ? prev : [...prev, newUser]);
-        setSelectedUser(newUser);
+        handleSelectUser(newUser); // use updated select handler
       } catch (err) {
         console.error("Error fetching user profile:", err);
       }
@@ -87,7 +86,7 @@ export default function ChatPage() {
       setUsers(prev =>
         prev.map(u =>
           u._id === msg.sender || u._id === msg.receiver
-            ? { ...u, lastMessage: msg.content, timestamp: msg.timestamp }
+            ? { ...u, lastMessage: msg.content, timestamp: msg.timestamp, unreadCount: (u.unreadCount || 0) + 1 }
             : u
         )
       );
@@ -95,6 +94,25 @@ export default function ChatPage() {
     socket.on("newMessage", handleNewMessage);
     return () => socket.off("newMessage", handleNewMessage);
   }, [socket]);
+
+  // 🟢 Handle selecting a chat (mark messages read)
+  const handleSelectUser = async (user) => {
+    setSelectedUser(user);
+
+    try {
+      await axios.put(`${API_URL}/api/messages/seen/${user._id}`, {}, { withCredentials: true });
+
+
+      // Update frontend immediately
+      setUsers(prev =>
+        prev.map(u =>
+          u._id === user._id ? { ...u, unreadCount: 0 } : u
+        )
+      );
+    } catch (err) {
+      console.error("❌ Error marking messages as read:", err);
+    }
+  };
 
   return (
     <div className="h-screen pt-21 flex bg-gray-50">
@@ -107,7 +125,7 @@ export default function ChatPage() {
               users={users}
               currentUserId={currentUserId}
               selectedUserId={selectedUser?._id}
-              onSelectUser={setSelectedUser}
+              onSelectUser={handleSelectUser} // ✅ updated handler
             />
           </aside>
 
@@ -150,7 +168,7 @@ export default function ChatPage() {
               users={users}
               currentUserId={currentUserId}
               selectedUserId={selectedUser?._id}
-              onSelectUser={setSelectedUser}
+              onSelectUser={handleSelectUser} // ✅ updated handler
             />
           )}
         </main>
