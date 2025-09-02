@@ -8,33 +8,29 @@ import {
   FiSend, FiPhone, FiVideo, FiMoreVertical, FiTrash2, FiArrowLeft 
 } from "react-icons/fi";
 
-/**
- * ChatWindow Component
- * 
- * Props:
- * - selectedUser: Object containing info of the currently selected chat user
- * - currentUserId: ID of the logged-in user
- * - onBack: Function to handle "back" action on mobile
- */
 export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const bottomRef = useRef(); // Ref to scroll to bottom
+  const bottomRef = useRef();
   const socket = getSocket();
-  // Socket.io instance
-
-  // Track mobile view
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const API_URL = import.meta.env.VITE_API_URL;
 
-  /** Update mobile view on window resize */
+  // ✅ Resize listener for mobile view
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  /** Listen for "seenMessage" events from socket */
+  // ✅ Join the user's room on connect
+  useEffect(() => {
+    if (currentUserId) {
+      socket.emit("join-room", currentUserId);
+    }
+  }, [currentUserId, socket]);
+
+  // ✅ Listen for "seenMessage" updates
   useEffect(() => {
     socket.on("seenMessage", ({ userId }) => {
       if (userId === selectedUser._id) {
@@ -50,7 +46,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
     return () => socket.off("seenMessage");
   }, [socket, selectedUser, currentUserId]);
 
-  /** Mark messages as seen when opening chat */
+  // ✅ Mark messages as seen when opening chat
   useEffect(() => {
     if (!selectedUser) return;
     axios.put(
@@ -68,7 +64,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
     }).catch(() => {});
   }, [selectedUser]);
 
-  /** Fetch chat messages from backend */
+  // ✅ Fetch chat history
   useEffect(() => {
     if (!selectedUser) return;
     axios.get(`${API_URL}/api/messages/${selectedUser._id}`, {
@@ -78,7 +74,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
       .catch(() => {});
   }, [selectedUser]);
 
-  /** Listen for incoming messages in real-time */
+  // ✅ Listen for new messages in real-time
   useEffect(() => {
     socket.on("newMessage", (msg) => {
       if (msg.sender === selectedUser._id || msg.receiver === selectedUser._id) {
@@ -88,12 +84,12 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
     return () => socket.off("newMessage");
   }, [socket, selectedUser]);
 
-  /** Scroll chat to bottom whenever messages change */
+  // ✅ Auto scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /** Send new message */
+  // ✅ Send a message
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
@@ -104,15 +100,20 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
         { content: newMessage },
         { withCredentials: true }
       );
+
+      // Optimistically update UI
       setMessages(prev => [...prev, res.data]);
       setNewMessage("");
+
+      // Send to socket server
       socket.emit("send-message", res.data);
+
     } catch (err) {
       console.error("❌ Sending message failed:", err);
     }
   };
 
-  /** Delete a specific message */
+  // ✅ Delete a specific message
   const handleDeleteMessage = async (id) => {
     try {
       await axios.put(
@@ -128,8 +129,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
 
   return (
     <div className="flex-1 flex flex-col pt-2 h-full bg-gray-100">
-
-      {/* Header Section */}
+      {/* Header */}
       <div className="px-4 py-3 border-b flex items-center justify-between bg-white shadow-sm">
         <div className="flex items-center gap-3">
           {isMobile && onBack && (
@@ -159,7 +159,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
         </div>
       </div>
 
-      {/* Messages Section */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map(msg => {
           const senderId = msg.sender?.toString() || msg.sender;
@@ -175,7 +175,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
               >
                 <p>{msg.content}</p>
 
-                {/* Timestamp and seen indicator */}
+                {/* Timestamp + Seen */}
                 <div className="flex justify-end items-center gap-1 mt-1 text-[10px] opacity-80">
                   <span>{formatTime(msg.timestamp)}</span>
                   {isSender && (
@@ -187,7 +187,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
                   )}
                 </div>
 
-                {/* Delete button on hover */}
+                {/* Delete button */}
                 <button
                   onClick={() => handleDeleteMessage(msg._id)}
                   className="absolute hidden group-hover:block top-1 right-1 text-xs text-white/80 hover:text-red-500"
@@ -201,7 +201,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input Section */}
+      {/* Input */}
       <form onSubmit={sendMessage} className="p-3 border-t flex items-center gap-2 bg-white">
         <input
           type="text"
