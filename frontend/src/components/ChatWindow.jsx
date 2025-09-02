@@ -30,7 +30,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
     }
   }, [currentUserId, socket]);
 
-  // ✅ Listen for "seenMessage" events from the server
+  // ✅ Listen for "seenMessage" updates
   useEffect(() => {
     socket.on("seenMessage", ({ userId }) => {
       if (userId === selectedUser._id) {
@@ -46,7 +46,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
     return () => socket.off("seenMessage");
   }, [socket, selectedUser, currentUserId]);
 
-  // ✅ Mark selected user's messages as seen (both API + socket notify)
+  // ✅ Mark messages as seen when opening chat
   useEffect(() => {
     if (!selectedUser) return;
     axios.put(
@@ -61,10 +61,8 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
             : m
         )
       );
-      // 🔔 Tell the sender their messages were seen
-      socket.emit("seen-message", { userId: currentUserId, seenBy: selectedUser._id });
     }).catch(() => {});
-  }, [selectedUser, currentUserId, API_URL, socket]);
+  }, [selectedUser]);
 
   // ✅ Fetch chat history
   useEffect(() => {
@@ -74,7 +72,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
     })
       .then(res => setMessages(res.data))
       .catch(() => {});
-  }, [selectedUser, API_URL]);
+  }, [selectedUser]);
 
   // ✅ Listen for new messages in real-time
   useEffect(() => {
@@ -103,8 +101,11 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
         { withCredentials: true }
       );
 
+      // Optimistically update UI
+      setMessages(prev => [...prev, res.data]);
       setNewMessage("");
-      // Socket server will broadcast the newMessage event
+
+      // Send to socket server
       socket.emit("send-message", res.data);
 
     } catch (err) {
