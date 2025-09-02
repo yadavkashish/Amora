@@ -104,6 +104,11 @@ router.post('/:receiverId', async (req, res) => {
     });
 
     await msg.save();
+    // ✅ Emit real-time update
+    const io = req.app.get("io");
+    io.to(receiverId.toString()).emit("newMessage", msg);
+    io.to(currentUserId.toString()).emit("newMessage", msg);
+    
     res.status(201).json(msg);
   } catch (err) {
     console.error("Error sending message:", err);
