@@ -12,10 +12,11 @@ const createToken = (userId) => {
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production", // true on Render
-  sameSite: "None", // ✅ allow cross-site
+  secure: process.env.NODE_ENV === "production" ? true : false, // 👈 false locally
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // 👈 safer for localhost
   maxAge: 7 * 24 * 60 * 60 * 1000
 };
+
 
 
 // ✅ Step 1: Send OTP (Signup)
