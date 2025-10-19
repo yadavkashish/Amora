@@ -23,7 +23,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       'http://localhost:5173',         // Local dev
-      'https://amorateams.netlify.app'
+      'https://amorateams.netlify.app',
       'https://www.amoraonline.in'
     ],
     credentials: true
@@ -51,7 +51,7 @@ io.on('connection', (socket) => {
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://amorateams.netlify.app'
+    'https://amorateams.netlify.app',
     'https://www.amoraonline.in'
   ],
   credentials: true
