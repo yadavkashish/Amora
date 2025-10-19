@@ -23,7 +23,8 @@ const io = new Server(server, {
   cors: {
     origin: [
       'http://localhost:5173',         // Local dev
-      'https://amorateams.netlify.app' // Netlify frontend
+      'https://amorateams.netlify.app'
+      'https://www.amoraonline.in'
     ],
     credentials: true
   }
