@@ -52,6 +52,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'https://amorateams.netlify.app'
+    'https://www.amoraonline.in'
   ],
   credentials: true
 }));
