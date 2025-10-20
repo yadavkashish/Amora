@@ -1,0 +1,28 @@
+[33mcbfd0fe[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m route removed
+[33me23dec1[m update
+[33m94798af[m server updates
+[33m70d98b0[m added gender filter
+[33m363614b[m message update
+[33mb0d7632[m added myemailverifier_api
+[33m1a63326[m edit message
+[33m69ff685[m Revert "added email validator"
+[33m9d86665[m Revert "limits added"
+[33mce19067[m limits added
+[33m56d2a9a[m added email validator
+[33m11eaed5[m Revert "socket update"
+[33mb6fe8d1[m socket update
+[33m4eacb53[m socket update
+[33m0633147[m updated email
+[33m6a5246a[m error resolved
+[33m52f1be3[m error resolved
+[33mf4eb822[m error resolved
+[33m6e784d5[m error resolved
+[33m7ca3060[m implimented cloudinary
+[33me93b5fc[m added _redirects
+[33m2ede91f[m cookies
+[33m93f27ad[m cookies
+[33m67bf342[m added frontend link to backend
+[33me360be6[m improved frontend
+[33mb42faa4[m modified version
+[33m79ccf71[m Fixed code
+[33mb02a200[m first commit
