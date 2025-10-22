@@ -1,3 +1,40 @@
+# =========================
+# robots.txt for Amora Online
+# =========================
+
 User-agent: *
+# ❌ Block all backend & API endpoints
+Disallow: /api/
+Disallow: /server/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /staging/
+Disallow: /private/
+
+# ✅ Allow all public-facing routes (React app)
 Allow: /
+Allow: /public/
+Allow: /assets/
+Allow: /images/
+Allow: /css/
+Allow: /js/
+Allow: /sitemap.xml
+
+# 🧭 Sitemap for better indexing
 Sitemap: https://www.amoraonline.in/sitemap.xml
+
+# =========================
+# Notes:
+# - All /api/ endpoints are backend logic — blocked
+# - React frontend routes stay crawlable for SEO
+# - Keep sitemap updated with actual public URLs
+# =========================
+# Allow AI crawlers to read public content
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
