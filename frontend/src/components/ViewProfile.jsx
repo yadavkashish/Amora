@@ -1,236 +1,276 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import CompareDialog from "./CompareDialog";
+import axios from "axios";
+import { motion } from "framer-motion"; // optional for smooth fade-in
 
-/**
- * ViewProfile Component
- * Displays detailed user profile with banner, gallery, interests, and full-screen media preview.
- */
 export default function ViewProfile() {
   const { userId } = useParams();
   const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-  // State
   const [profile, setProfile] = useState(null);
+  const [otherPersonReport, setOtherPersonReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [mediaPreview, setMediaPreview] = useState(null);
+  const [compareOpen, setCompareOpen] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL; // Base API URL from .env
-
-  /** Fetch profile data on component mount or when userId changes */
   useEffect(() => {
-    const fetchProfile = async () => {
+    if (!userId) return;
+    const fetchAll = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch(`${API_URL}/api/profile/user/${userId}`, {
-          credentials: 'include',
-        });
+        const profileRes = await fetch(
+          `${API_URL}/api/profile/user/${userId}`,
+          { credentials: "include" }
+        );
+        if (!profileRes.ok) throw new Error("Profile fetch failed");
+        const profileData = await profileRes.json();
+        setProfile(profileData);
 
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-
-        const data = await res.json();
-        setProfile(data);
+        try {
+          const pr = await axios.get(`${API_URL}/api/personality/${userId}`, {
+            withCredentials: true,
+          });
+          const report = pr.data.report ?? pr.data;
+          setOtherPersonReport(report?.report ? report.report : report);
+        } catch (err) {
+          console.warn("No personality report found:", err?.response?.status);
+          setOtherPersonReport(null);
+        }
       } catch (err) {
-        console.error('Failed to fetch profile:', err);
-        setError(err.message);
+        console.error("Failed to fetch profile page data:", err);
+        setError("Failed to load profile. Try again later.");
       } finally {
         setLoading(false);
       }
     };
 
-    if (userId) fetchProfile();
+    fetchAll();
   }, [userId, API_URL]);
 
-  /** Helper to generate image/video URLs */
-  const mediaURL = (url) =>
-    url ? url : '/default-avatar.png';
-
-
-  /** Loading state */
-  if (loading) {
+  if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center text-xl">
-        Loading profile...
+      <div className="min-h-screen flex items-center justify-center text-pink-600 font-semibold text-lg">
+        Loading profile…
       </div>
     );
-  }
 
-  /** Error state */
-  if (error) {
+  if (error)
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-red-600">
-        <p className="text-xl">⚠️ Error: {error}</p>
+      <div className="min-h-screen flex flex-col items-center justify-center text-center">
+        <p className="text-red-600 font-medium">{error}</p>
         <button
           onClick={() => navigate(-1)}
-          className="mt-4 bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600"
+          className="mt-4 px-5 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
         >
-          Go Back
+          Go back
         </button>
       </div>
     );
-  }
 
-  /** No profile found state */
-  if (!profile) {
+  if (!profile)
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-xl">
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
         No profile found.
-        <button
-          onClick={() => navigate(-1)}
-          className="mt-4 bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600"
-        >
-          Go Back
-        </button>
       </div>
     );
-  }
 
   return (
-    <section className="min-h-screen relative flex pt-23 justify-center items-start py-10 px-6">
-
-      {/* Background Video */}
-      <video
-        className="absolute inset-0 w-full h-full object-cover z-0"
-        src="/bgvideos/bg.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-      ></video>
-
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b z-0"></div>
-
-      {/* Profile Card */}
-      <div className="relative z-10 max-w-3xl w-full bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden">
-
-        {/* Banner + Profile Picture */}
-        <div className="h-40 bg-gradient-to-r from-pink-400 to-purple-400 relative">
-          <img
-            src={mediaURL(profile.profilePic)}
-            alt="Profile"
-            className="w-32 h-32 rounded-full object-cover absolute left-1/2 -bottom-16 transform -translate-x-1/2 border-4 border-white shadow-lg cursor-pointer"
-            onClick={() => setMediaPreview({ type: 'image', src: mediaURL(profile.profilePic) })}
-          />
-        </div>
-
-        {/* Profile Info */}
-        <div className="pt-20 pb-8 px-6 text-center space-y-4">
-          <h2 className="text-3xl font-bold text-gray-800">{profile.name}</h2>
-          <p className="text-gray-500">{profile.location || 'Unknown Location'}</p>
-          <p className="text-gray-600 italic">"{profile.bio || 'No bio yet'}"</p>
-
-          {/* Email */}
-          {profile.user?.email && (
-            <p className="text-gray-700">
-              📧{' '}
-              <a
-                href={`mailto:${profile.user.email}`}
-                className="font-medium underline hover:text-pink-600 transition"
-              >
-                {profile.user.email}
-              </a>
-            </p>
-          )}
-
-          {/* Basic Info */}
-          <div className="flex flex-wrap justify-center gap-6 text-gray-700 text-lg">
-            <p><strong>Age:</strong> {profile.age}</p>
-            <p><strong>Gender:</strong> {profile.gender}</p>
-            <p><strong>Interested In:</strong> {profile.preference}</p>
-          </div>
-
-          {/* College / Course Info */}
-          <div className="flex flex-wrap justify-center gap-3 mt-4">
-            <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full shadow-sm text-sm">
-              🎓 {profile.course}
-            </span>
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full shadow-sm text-sm">
-              🏫 {profile.branch}
-            </span>
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full shadow-sm text-sm">
-              📅 Year {profile.year}
-            </span>
-          </div>
-        </div>
-
-        {/* Interests */}
-        {profile.interests?.length > 0 && (
-          <div className="px-6 py-4 border-t">
-            <h3 className="text-xl font-semibold text-pink-600 mb-2">Interests</h3>
-            <div className="flex flex-wrap gap-2">
-              {profile.interests.map((interest, idx) => (
-                <span
-                  key={idx}
-                  className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm shadow-sm"
-                >
-                  {interest}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Gallery */}
-        {(profile.morePics?.length > 0 || profile.videos?.length > 0) && (
-          <div className="px-6 py-6 border-t">
-            <h3 className="text-xl font-semibold text-pink-600 mb-4">Gallery</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {profile.morePics?.map((pic, idx) => (
-                <img
-                  key={idx}
-                  src={mediaURL(pic)}
-                  alt={`Pic ${idx + 1}`}
-                  className="w-full h-28 object-cover rounded-lg cursor-pointer hover:scale-105 transition"
-                  onClick={() => setMediaPreview({ type: 'image', src: mediaURL(pic) })}
-                />
-              ))}
-              {profile.videos?.map((vid, idx) => (
-                <video
-                  key={idx}
-                  src={mediaURL(vid)}
-                  className="w-full h-28 object-cover rounded-lg cursor-pointer hover:scale-105 transition"
-                  onClick={() => setMediaPreview({ type: 'video', src: mediaURL(vid) })}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Back Button */}
-        <div className="px-6 py-6">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-full mt-4 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-      </div>
-
-      {/* Fullscreen Media Modal */}
-      {mediaPreview && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50"
-          onClick={() => setMediaPreview(null)}
-        >
-          {mediaPreview.type === 'image' ? (
+    <section className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 py-12 px-6 pt-23">
+      <motion.div
+        className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* Left: Profile Section (50%) */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100 transition hover:shadow-xl">
+          <div className="flex flex-col items-center text-center">
             <img
-              src={mediaPreview.src}
-              alt="Full view"
-              className="max-h-[90%] max-w-[90%] object-contain rounded-lg shadow-lg"
+              src={profile.profilePic || "/default-avatar.png"}
+              alt={profile.name}
+              className="w-32 h-32 rounded-full object-cover shadow-md border-2 border-pink-100"
             />
-          ) : (
-            <video
-              src={mediaPreview.src}
-              controls
-              autoPlay
-              className="max-h-[90%] max-w-[90%] rounded-lg shadow-lg"
-            />
+            <h2 className="text-2xl font-bold mt-4 text-gray-800">
+              {profile.name}
+            </h2>
+            <p className="text-gray-500 text-sm">{profile.location}</p>
+
+            {profile.bio && (
+              <p className="mt-3 italic text-gray-700 max-w-md">
+                “{profile.bio}”
+              </p>
+            )}
+
+            {/* Basic Details */}
+            <div className="mt-6 w-full">
+              <div className="grid grid-cols-2 gap-y-3 text-sm text-gray-700">
+                <div>
+                  <span className="font-semibold text-gray-800">Age:</span>{" "}
+                  {profile.age ?? "—"}
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-800">Gender:</span>{" "}
+                  {profile.gender ?? "—"}
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-800">
+                    Interested In:
+                  </span>{" "}
+                  {profile.preference ?? "—"}
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-800">Course:</span>{" "}
+                  {profile.course ?? "—"}
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="mt-4 text-sm text-gray-700">
+                <span className="font-semibold text-gray-800">Email:</span>{" "}
+                {profile.user?.email ?? "—"}
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="mt-6 flex gap-3">
+              <button
+                className="px-5 py-2.5 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition font-medium"
+                onClick={() => navigate(`/chat/${profile.user?._id ?? userId}`)}
+              >
+                💬 Message
+              </button>
+            </div>
+          </div>
+
+          {/* Interests */}
+          <div className="mt-8 border-t pt-5">
+            <h4 className="font-semibold mb-3 text-gray-800">Interests</h4>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {profile.interests?.length > 0 ? (
+                profile.interests.map((it, i) => (
+                  <span
+                    key={i}
+                    className="px-3 py-1 bg-pink-50 text-pink-700 rounded-full text-sm border border-pink-100"
+                  >
+                    {it}
+                  </span>
+                ))
+              ) : (
+                <span className="text-gray-500 text-sm">
+                  No interests listed
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Gallery */}
+          {profile.morePics?.length > 0 && (
+            <div className="mt-8 border-t pt-5">
+              <h4 className="font-semibold mb-3 text-gray-800">Gallery</h4>
+              <div className="grid grid-cols-3 gap-3">
+                {profile.morePics.map((p, i) => (
+                  <img
+                    key={i}
+                    src={p}
+                    alt={`pic-${i}`}
+                    className="h-24 w-full object-cover rounded-lg shadow-sm"
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </div>
-      )}
+
+        {/* --- Right: Personality Report --- */}
+        <aside className="bg-white/90 backdrop-blur-sm border border-purple-100 rounded-2xl shadow-xl p-8 hover:shadow-2xl transition">
+          <h3 className="text-2xl font-bold text-purple-700 mb-4">
+            🧠 Personality Report
+          </h3>
+
+          {!otherPersonReport ? (
+            <div className="text-sm text-gray-600 italic">
+              No personality report available for this user.
+            </div>
+          ) : (
+            <>
+              <div className="mb-5">
+                <p className="text-lg font-semibold text-purple-700">
+                  {otherPersonReport.personalityType}
+                </p>
+                <p className="text-gray-700 mt-2 text-sm leading-relaxed">
+                  {otherPersonReport.summary}
+                </p>
+              </div>
+
+              <div className="mb-5">
+                <h5 className="text-sm font-semibold uppercase text-purple-600 tracking-wide">
+                  Trait Scores
+                </h5>
+                <ul className="mt-3 space-y-1 text-sm text-gray-700">
+                  {Object.entries(otherPersonReport.traits || {}).map(
+                    ([k, v]) => (
+                      <li
+                        key={k}
+                        className="flex justify-between border-b border-gray-100 py-1"
+                      >
+                        <span className="capitalize">
+                          {k.replace("_", " ")}
+                        </span>
+                        <span className="font-medium text-purple-700">
+                          {v ?? "—"}
+                        </span>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+
+              {otherPersonReport.strengths?.length > 0 && (
+                <div className="mb-5">
+                  <h5 className="text-sm font-semibold uppercase text-purple-600 tracking-wide">
+                    Strengths
+                  </h5>
+                  <ul className="list-disc pl-5 mt-2 text-sm text-gray-700 space-y-1">
+                    {otherPersonReport.strengths.map((s, idx) => (
+                      <li key={idx}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {otherPersonReport.challenges?.length > 0 && (
+                <div className="mb-5">
+                  <h5 className="text-sm font-semibold uppercase text-purple-600 tracking-wide">
+                    Challenges
+                  </h5>
+                  <ul className="list-disc pl-5 mt-2 text-sm text-gray-700 space-y-1">
+                    {otherPersonReport.challenges.map((c, idx) => (
+                      <li key={idx}>{c}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <button
+                className="w-full mt-4 px-5 py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition"
+                onClick={() => setCompareOpen(true)}
+              >
+                💞 Compare Personalities
+              </button>
+            </>
+          )}
+        </aside>
+      </motion.div>
+
+      <CompareDialog
+        open={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        otherReport={otherPersonReport}
+      />
     </section>
   );
 }
