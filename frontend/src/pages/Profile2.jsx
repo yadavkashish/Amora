@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaPlus } from "react-icons/fa";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaPlus } from 'react-icons/fa';
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
@@ -15,23 +15,24 @@ export default function Profile() {
 
   const API_URL = import.meta.env.VITE_API_URL;
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/profile/latest`, {
-          credentials: "include",
-        });
-        const data = await res.json();
-        setProfile(data);
-        setFormData(data);
-      } catch (err) {
-        console.error("Failed to fetch profile:", err);
-      }
-    };
-    fetchProfile();
-  }, []);
+useEffect(() => {
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/profile/latest`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      setProfile(data);
+      setFormData(data);
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
+    }
+  };
+  fetchProfile();
+}, []);
 
-  const imageURL = (url) => url || "/default-avatar.png";
+  const imageURL = (url) => url || '/default-avatar.png';
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -39,9 +40,8 @@ export default function Profile() {
   };
 
   const handleFileChange = (e, type) => {
-    if (type === "profilePic") setNewProfilePic(e.target.files[0]);
-    if (type === "morePics")
-      setNewMorePics([...newMorePics, ...Array.from(e.target.files)]);
+    if (type === 'profilePic') setNewProfilePic(e.target.files[0]);
+    if (type === 'morePics') setNewMorePics([...newMorePics, ...Array.from(e.target.files)]);
   };
 
   const handleDeleteMorePic = (filename) => {
@@ -56,27 +56,24 @@ export default function Profile() {
     try {
       const data = new FormData();
       for (const key in formData) {
-        if (key === "morePics") {
-          formData.morePics.forEach((pic) =>
-            data.append("existingMorePics[]", pic)
-          );
+        if (key === 'morePics') {
+          formData.morePics.forEach((pic) => data.append('existingMorePics[]', pic));
         } else if (Array.isArray(formData[key])) {
           data.append(key, JSON.stringify(formData[key]));
         } else {
           data.append(key, formData[key]);
         }
       }
-      if (newProfilePic) data.append("profilePic", newProfilePic);
-      if (newMorePics.length > 0)
-        newMorePics.forEach((file) => data.append("morePics", file));
+      if (newProfilePic) data.append('profilePic', newProfilePic);
+      if (newMorePics.length > 0) newMorePics.forEach((file) => data.append('morePics', file));
 
       const res = await fetch(`${API_URL}/api/profile/${profile._id}`, {
-        method: "PUT",
+        method: 'PUT',
         body: data,
-        credentials: "include",
+        credentials: 'include',
       });
 
-      if (!res.ok) throw new Error("Update failed");
+      if (!res.ok) throw new Error('Update failed');
 
       const updatedProfile = await res.json();
       setProfile(updatedProfile);
@@ -92,10 +89,10 @@ export default function Profile() {
   if (!profile)
     return (
       <div className="min-h-screen flex items-center justify-center text-xl">
-        No data found. Please{" "}
+        No data found. Please{' '}
         <button
           className="ml-2 text-pink-600 underline"
-          onClick={() => navigate("/profile-form")}
+          onClick={() => navigate('/profile-form')}
         >
           fill your profile
         </button>
@@ -128,37 +125,20 @@ export default function Profile() {
                 src={imageURL(profile.profilePic)}
                 alt="Profile"
                 className="w-32 h-32 rounded-full object-cover absolute left-1/2 -bottom-16 transform -translate-x-1/2 border-4 border-white shadow-lg cursor-pointer"
-                onClick={() =>
-                  setMediaPreview({
-                    type: "image",
-                    src: imageURL(profile.profilePic),
-                  })
-                }
+                onClick={() => setMediaPreview({ type: 'image', src: imageURL(profile.profilePic) })}
               />
             </div>
 
             {/* Info */}
             <div className="pt-20 pb-8 px-6 text-center space-y-4">
-              <h2 className="text-3xl font-bold text-gray-800">
-                {profile.name}
-              </h2>
-              <p className="text-gray-500">
-                {profile.location || "Unknown Location"}
-              </p>
-              <p className="text-gray-600 italic">
-                "{profile.bio || "No bio yet"}"
-              </p>
+              <h2 className="text-3xl font-bold text-gray-800">{profile.name}</h2>
+              <p className="text-gray-500">{profile.location || 'Unknown Location'}</p>
+              <p className="text-gray-600 italic">"{profile.bio || 'No bio yet'}"</p>
 
               <div className="flex flex-wrap justify-center gap-6 text-gray-700 text-lg">
-                <p>
-                  <strong>Age:</strong> {profile.age}
-                </p>
-                <p>
-                  <strong>Gender:</strong> {profile.gender}
-                </p>
-                <p>
-                  <strong>Interested In:</strong> {profile.preference}
-                </p>
+                <p><strong>Age:</strong> {profile.age}</p>
+                <p><strong>Gender:</strong> {profile.gender}</p>
+                <p><strong>Interested In:</strong> {profile.preference}</p>
               </div>
 
               {/* 🎓 College Info */}
@@ -184,9 +164,7 @@ export default function Profile() {
             {/* Interests */}
             {profile.interests?.length > 0 && (
               <div className="px-6 py-4 border-t">
-                <h3 className="text-xl font-semibold text-pink-600 mb-2">
-                  Interests
-                </h3>
+                <h3 className="text-xl font-semibold text-pink-600 mb-2">Interests</h3>
                 <div className="flex flex-wrap gap-2">
                   {profile.interests.map((interest, idx) => (
                     <span
@@ -203,9 +181,7 @@ export default function Profile() {
             {/* Gallery */}
             {profile.morePics?.length > 0 && (
               <div className="px-6 py-6 border-t">
-                <h3 className="text-xl font-semibold text-pink-600 mb-4">
-                  Gallery
-                </h3>
+                <h3 className="text-xl font-semibold text-pink-600 mb-4">Gallery</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {profile.morePics.map((pic, idx) => (
                     <img
@@ -213,28 +189,17 @@ export default function Profile() {
                       src={imageURL(pic)}
                       alt={`Pic ${idx + 1}`}
                       className="w-full h-28 object-cover rounded-lg cursor-pointer hover:scale-105 transition"
-                      onClick={() =>
-                        setMediaPreview({ type: "image", src: imageURL(pic) })
-                      }
+                      onClick={() => setMediaPreview({ type: 'image', src: imageURL(pic) })}
                     />
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="px-6 py-6 space-y-3">
-              {/* 🧠 Personality Report Button */}
-              <button
-                onClick={() => navigate("/personality-report")}
-                className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition"
-              >
-                🧠 View Personality Report
-              </button>
-
-              {/* ✏️ Edit Profile Button */}
+            <div className="px-6 py-6">
               <button
                 onClick={() => setIsEditing(true)}
-                className="w-full bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition"
+                className="w-full mt-4 bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700"
               >
                 ✏️ Edit Profile
               </button>
@@ -248,11 +213,7 @@ export default function Profile() {
             {/* Profile Picture Edit */}
             <div className="flex justify-center relative mb-6">
               <img
-                src={
-                  newProfilePic
-                    ? URL.createObjectURL(newProfilePic)
-                    : imageURL(profile.profilePic)
-                }
+                src={newProfilePic ? URL.createObjectURL(newProfilePic) : imageURL(profile.profilePic)}
                 className="w-28 h-28 rounded-full object-cover border-4 border-pink-500"
               />
               <label className="absolute bottom-0 right-1 bg-pink-600 text-white p-2 rounded-full cursor-pointer shadow-lg">
@@ -261,14 +222,14 @@ export default function Profile() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => handleFileChange(e, "profilePic")}
+                  onChange={(e) => handleFileChange(e, 'profilePic')}
                 />
               </label>
             </div>
 
             <input
               name="name"
-              value={formData.name || ""}
+              value={formData.name || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Name"
@@ -276,67 +237,67 @@ export default function Profile() {
             <input
               type="number"
               name="age"
-              value={formData.age || ""}
+              value={formData.age || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Age"
             />
             <input
               name="gender"
-              value={formData.gender || ""}
+              value={formData.gender || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Gender"
             />
             <input
               name="preference"
-              value={formData.preference || ""}
+              value={formData.preference || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Interested In"
             />
             <input
               name="location"
-              value={formData.location || ""}
+              value={formData.location || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Location"
             />
             <textarea
               name="bio"
-              value={formData.bio || ""}
+              value={formData.bio || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Bio"
             />
             <input
               name="course"
-              value={formData.course || ""}
+              value={formData.course || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Course"
             />
             <input
               name="branch"
-              value={formData.branch || ""}
+              value={formData.branch || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Branch"
             />
             <input
               name="year"
-              value={formData.year || ""}
+              value={formData.year || ''}
               onChange={handleChange}
               className="w-full border p-2 rounded-lg"
               placeholder="Year"
             />
             <input
               name="interests"
-              value={formData.interests?.join(", ") || ""}
+              value={formData.interests?.join(', ') || ''}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  interests: e.target.value.split(",").map((i) => i.trim()),
+                  interests: e.target.value.split(',').map((i) => i.trim()),
                 })
               }
               className="w-full border p-2 rounded-lg"
@@ -349,10 +310,7 @@ export default function Profile() {
               <div className="flex flex-wrap gap-3">
                 {formData.morePics?.map((pic, idx) => (
                   <div key={idx} className="relative">
-                    <img
-                      src={imageURL(pic)}
-                      className="w-24 h-24 rounded-lg object-cover"
-                    />
+                    <img src={imageURL(pic)} className="w-24 h-24 rounded-lg object-cover" />
                     <button
                       type="button"
                       className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 text-xs"
@@ -370,7 +328,7 @@ export default function Profile() {
                     accept="image/*"
                     multiple
                     className="hidden"
-                    onChange={(e) => handleFileChange(e, "morePics")}
+                    onChange={(e) => handleFileChange(e, 'morePics')}
                   />
                 </label>
               </div>

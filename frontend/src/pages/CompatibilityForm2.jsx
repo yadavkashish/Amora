@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 import { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 
 const questions = [
   {
@@ -237,126 +237,6 @@ const questions = [
       "Experiencing adventures together",
     ],
   },
-  {
-    id: "Q24",
-    text: "When faced with a big life choice, you usually:",
-    options: [
-      "Go with what feels right in the moment",
-      "Carefully weigh pros and cons before acting",
-      "Ask trusted people for opinions before deciding",
-      "Follow your long-term plan or intuition, whichever aligns better",
-    ],
-  },
-  {
-    id: "Q25",
-    text: "When something unexpected disrupts your plans:",
-    options: [
-      "I adapt quickly and find a new way forward",
-      "I need a bit of time but eventually adjust",
-      "I get stressed and struggle to regain balance",
-      "I prefer structure — surprises throw me off",
-    ],
-  },
-  {
-    id: "Q26",
-    text: "In conversations, you tend to:",
-    options: [
-      "Speak your mind openly and passionately",
-      "Express thoughts clearly but avoid unnecessary conflict",
-      "Listen more than you talk",
-      "Keep emotions private unless you deeply trust the person",
-    ],
-  },
-  {
-    id: "Q27",
-    text: "How do you usually approach your day?",
-    options: [
-      "I like having a clear plan and sticking to it",
-      "I keep a loose structure but adapt as needed",
-      "I mostly go with the flow and see how the day unfolds",
-      "I thrive on spontaneous decisions",
-    ],
-  },
-  {
-    id: "Q28",
-    text: "When tension arises between you and someone close:",
-    options: [
-      "I address it calmly and directly",
-      "I try to smooth things over to keep peace",
-      "I withdraw until emotions cool down",
-      "I can’t rest until the issue is fully resolved",
-    ],
-  },
-  {
-    id: "Q29",
-    text: "After spending time with others, you usually feel:",
-    options: [
-      "Energized and uplifted",
-      "Content but ready for quiet time",
-      "Drained — I need alone time to recharge",
-      "Depends on the people and setting",
-    ],
-  },
-  {
-    id: "Q30",
-    text: "When faced with new ideas or perspectives:",
-    options: [
-      "I love exploring them deeply",
-      "I’m open-minded but realistic",
-      "I need solid proof before I accept something new",
-      "I prefer sticking with what I know works",
-    ],
-  },
-  {
-    id: "Q31",
-    text: "When a friend is upset, you usually:",
-    options: [
-      "Feel their pain deeply and want to comfort them",
-      "Listen and give gentle advice",
-      "Try to stay objective to help them think clearly",
-      "Feel unsure how to respond but care quietly",
-    ],
-  },
-  {
-    id: "Q32",
-    text: "What drives you most in life?",
-    options: [
-      "Personal growth and learning",
-      "Success and achievement",
-      "Deep relationships and love",
-      "Freedom, peace, and balance",
-    ],
-  },
-  {
-    id: "Q33",
-    text: "When life feels overwhelming:",
-    options: [
-      "I stay calm and focus on solutions",
-      "I talk it out with someone I trust",
-      "I distract myself to avoid overthinking",
-      "I shut down until I regain control",
-    ],
-  },
-  {
-    id: "Q34",
-    text: "How often do you think about your emotions and behavior?",
-    options: [
-      "Constantly — I like understanding myself",
-      "Occasionally, when something feels off",
-      "Rarely — I focus on the present",
-      "Only when someone points it out",
-    ],
-  },
-  {
-    id: "Q35",
-    text: "In group projects or relationships, you usually:",
-    options: [
-      "Take the lead and organize things",
-      "Support others and ensure harmony",
-      "Prefer to contribute quietly in your way",
-      "Go with whatever the group decides",
-    ],
-  },
 ];
 
 export default function CompatibilityForm() {
@@ -385,27 +265,15 @@ export default function CompatibilityForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Submit compatibility answers
       await axios.post(
         `${API_URL}/api/compatibility/submit`,
         { answers, dealbreakers },
         { withCredentials: true }
       );
-
-      // Submit personality answers too
-      await axios.post(
-        `${API_URL}/api/personality/submit`,
-        { answers },
-        { withCredentials: true }
-      );
-
       setMessage("✅ Your answers have been saved!");
-      navigate("/profileform");
+      navigate('/profileform');
     } catch (err) {
-      console.error(
-        "❌ Error saving answers:",
-        err.response?.data || err.message
-      );
+      console.error("❌ Error saving answers:", err.response?.data || err.message);
       setMessage("❌ Error saving answers");
     }
   };
@@ -418,10 +286,7 @@ export default function CompatibilityForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {questions.map((q, idx) => (
-          <div
-            key={q.id}
-            className="p-4 border rounded-lg bg-gray-50 shadow-sm"
-          >
+          <div key={q.id} className="p-4 border rounded-lg bg-gray-50 shadow-sm">
             <p className="font-medium mb-3 text-gray-800">
               {idx + 1}. {q.text}
             </p>
@@ -445,9 +310,7 @@ export default function CompatibilityForm() {
 
         {/* Dealbreaker Section */}
         <div className="p-4 border rounded-lg bg-gray-100">
-          <p className="font-medium mb-3 text-gray-800">
-            Dealbreakers (optional):
-          </p>
+          <p className="font-medium mb-3 text-gray-800">Dealbreakers (optional):</p>
           <label className="block">
             <input
               type="checkbox"

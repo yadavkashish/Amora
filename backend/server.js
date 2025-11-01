@@ -9,6 +9,7 @@ require('dotenv').config();
 
 // Route imports
 const compatibilityRoutes = require("./routes/compatibility");
+const personalityRoutes = require("./routes/personality");
 const userRoutes = require('./routes/users');
 const profileRoutes = require('./routes/profile');
 const authRoutes = require('./routes/auth');
@@ -56,6 +57,17 @@ app.use(cors({
   ],
   credentials: true
 }));
+
+// app.use(cors({
+//   origin: "http://localhost:5173", // your frontend URL
+//   credentials: true                // allow cookies, authorization headers
+// }));
+// // ✅ Handle preflight (OPTIONS) requests properly
+// app.options('*', cors({
+//   origin: "http://localhost:5173",
+//   credentials: true
+// }));
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -68,6 +80,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/chat', chatRoutes);
 app.use("/api/compatibility", compatibilityRoutes);
+app.use("/api/personality", personalityRoutes);
 
 // ✅ MongoDB connection
 const PORT = process.env.PORT || 5000;

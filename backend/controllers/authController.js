@@ -14,10 +14,8 @@ const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production" ? true : false, // 👈 false locally
   sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // 👈 safer for localhost
-  maxAge: 7 * 24 * 60 * 60 * 1000
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
-
-
 
 // ✅ Step 1: Send OTP (Signup)
 exports.sendOtp = async (req, res) => {
@@ -40,7 +38,6 @@ exports.sendOtp = async (req, res) => {
     res.status(500).json({ error: "Error sending OTP" });
   }
 };
-
 
 // ✅ Step 2: Verify OTP & Register User
 exports.verifyOtpAndRegister = async (req, res) => {
@@ -70,12 +67,20 @@ exports.verifyOtpAndRegister = async (req, res) => {
     const token = createToken(user._id);
 
     // ✅ Send cookie like in login
-   res.cookie("token", token, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production", // true on Render
-  sameSite: "None", // ✅ required for cross-origin cookies
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-});
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // true on Render
+      sameSite: "None", // ✅ required for cross-origin cookies
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // const isProduction = process.env.NODE_ENV === "production";
+    // res.cookie("token", token, {
+    //   httpOnly: true,
+    //   secure: isProduction,
+    //   sameSite: isProduction ? "None" : "Lax",
+    //   maxAge: 7 * 24 * 60 * 60 * 1000,
+    // });
 
     res.status(201).json({
       message: "🎉 Account created & logged in successfully",
@@ -86,8 +91,6 @@ exports.verifyOtpAndRegister = async (req, res) => {
     res.status(500).json({ error: "Server error during registration" });
   }
 };
-
-
 
 // ✅ Forgot Password: Send OTP
 exports.forgotPassword = async (req, res) => {
@@ -139,7 +142,6 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ error: "Failed to reset password" });
   }
 };
-
 
 // ✅ Login
 exports.login = async (req, res) => {

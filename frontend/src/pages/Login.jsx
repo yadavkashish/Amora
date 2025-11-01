@@ -24,6 +24,8 @@ const handleSubmit = async (e) => {
       credentials: 'include',
     });
 
+    console.log(res)
+
     if (res.ok) {
       navigate('/dashboard'); // redirect to form page
     } else {

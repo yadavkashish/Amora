@@ -4,14 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-  "dev": "vite",
-  "start": "vite",
-  "build": "node generate-sitemap.js && vite build",
-  "lint": "eslint .",
-  "preview": "vite preview"
-}
-,
+    "dev": "vite",
+    "start": "vite",
+    "build": "node generate-sitemap.js && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
     "@react-three/drei": "^10.4.2",
     "@react-three/fiber": "^9.1.4",
     "@react-three/postprocessing": "^3.0.4",
