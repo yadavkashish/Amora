@@ -1,29 +1,26 @@
-const nodemailer = require("nodemailer");
+// utils/sendOtpEmail.js
+const { Resend } = require("resend");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail", // ✅ Gmail SMTP
-  auth: {
-    user: process.env.GMAIL_USER, // your Gmail address
-    pass: process.env.GMAIL_PASS, // your App Password
-  },
-});
+// Initialize Resend with API Key from .env
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendOtpEmail = async (to, otp) => {
   try {
-    const mailOptions = {
-      from: `"Amora" <${process.env.GMAIL_USER}>`, // ✅ shows as Amora
+    const data = await resend.emails.send({
+      from: "Amora <no-reply@amoraonline.in>", // use your verified domain
       to,
       subject: "Your Amora OTP Code",
-      text: `Hi! Your Amora verification code is ${otp}. It’s valid for the next 5 minutes. Enter it to continue your journey to meaningful connections!`,
-      html: `<p>Hi! Your Amora verification code is <b>${otp}</b>.</p>
-             <p>It’s valid for the next <b>5 minutes</b>. Enter it to continue your journey to meaningful connections! ❤️</p>`,
-    };
+      html: `
+        <p>Hi! Your Amora verification code is <b>${otp}</b>.</p>
+        <p>It’s valid for the next <b>5 minutes</b>. Enter it to continue your journey! ❤️</p>
+      `,
+    });
 
-    await transporter.sendMail(mailOptions);
-    console.log("✅ OTP sent to", to);
+    console.log("✅ OTP sent successfully:", data);
+    return data;
   } catch (error) {
-    console.error("❌ Error sending OTP:", error.message);
-    throw error;
+    console.error("❌ Error sending OTP:", error);
+    throw new Error("Failed to send OTP via Resend.");
   }
 };
 
