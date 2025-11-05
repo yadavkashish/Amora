@@ -44,29 +44,38 @@ const Signup = () => {
   };
 
   // STEP 2: Verify OTP & Create Account
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include", // 🔑 ensures cookie gets stored
-        body: JSON.stringify({ ...formData, otp }),
-      });
+const handleVerifyOtp = async (e) => {
+  e.preventDefault();
+  try {
+    const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",  // ✅ Important: includes cookies
+      body: JSON.stringify({ ...formData, otp }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (response.ok) {
-        alert(data.message);
-        navigate("/compatibilityform"); // ✅ no login step needed
-      } else {
-        alert("⚠️ " + (data.error || "Invalid OTP or registration error"));
-      }
-    } catch (err) {
-      console.error("❌ Error verifying OTP:", err);
-      alert("❌ Failed to connect to server");
+    if (response.ok) {
+      console.log('✅ Signup successful:', data);
+      
+      // ✅ Verify cookie was set
+      const cookies = document.cookie.split(';').map(c => c.trim());
+      console.log('🍪 Current cookies:', cookies);
+      
+      alert(data.message);
+      
+      // ✅ Navigate to compatibility form - cookie is already set!
+      navigate("/compatibilityform");
+    } else {
+      alert("⚠️ " + (data.error || "Invalid OTP or registration error"));
     }
-  };
+  } catch (err) {
+    console.error("❌ Error verifying OTP:", err);
+    alert("❌ Failed to connect to server");
+  }
+};
+
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">

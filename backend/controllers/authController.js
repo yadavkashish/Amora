@@ -56,31 +56,35 @@ exports.verifyOtpAndRegister = async (req, res) => {
     if (userExists)
       return res.status(400).json({ error: "Email already exists" });
 
-    // ✅ Create new user (password hashed by pre-save hook in User model)
+    // ✅ Create new user
     const user = new User({ name, email, password });
     await user.save();
 
-    // 🔑 Clean up OTPs for this email
+    // 🔑 Clean up OTPs
     await Otp.deleteMany({ email });
 
     // ✅ Generate JWT
-    const token = createToken(user._id);
-
-    // ✅ Send cookie like in login
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // true on Render
-      sameSite: "None", // ✅ required for cross-origin cookies
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
     });
 
-    // const isProduction = process.env.NODE_ENV === "production";
-    // res.cookie("token", token, {
-    //   httpOnly: true,
-    //   secure: isProduction,
-    //   sameSite: isProduction ? "None" : "Lax",
-    //   maxAge: 7 * 24 * 60 * 60 * 1000,
-    // });
+    // ✅ IMPORTANT: Use consistent cookie settings
+    const isProduction = process.env.NODE_ENV === "production";
+    
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: isProduction,           // ✅ true only in production
+      sameSite: isProduction ? "None" : "Lax",  // ✅ Only None in production
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/"
+    });
+
+    console.log('✅ User registered and cookie set:', {
+      isProduction,
+      sameSite: isProduction ? "None" : "Lax",
+      secure: isProduction,
+      userEmail: user.email
+    });
 
     res.status(201).json({
       message: "🎉 Account created & logged in successfully",
@@ -91,6 +95,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     res.status(500).json({ error: "Server error during registration" });
   }
 };
+
 
 // ✅ Forgot Password: Send OTP
 exports.forgotPassword = async (req, res) => {
@@ -144,29 +149,58 @@ exports.resetPassword = async (req, res) => {
 };
 
 // ✅ Login
+// ✅ LOGIN CONTROLLER - MUST SET COOKIE CORRECTLY
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log("🔑 Login attempt:", email);
 
-    if (!email || !password)
-      return res.status(400).json({ error: "Email and password required" });
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
 
+    // Find user
     const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
-    const isMatch = await user.comparePassword(password);
+    // Check password
+    const isPasswordCorrect = await user.comparePassword(password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
-    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
+    // ✅ CREATE JWT TOKEN
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-    const token = createToken(user._id);
-    res.cookie("token", token, cookieOptions);
+    // ✅ SET COOKIE WITH CORRECT OPTIONS
+    res.cookie('token', token, {
+      httpOnly: true,                    // Cannot be accessed by JavaScript
+      secure: process.env.NODE_ENV === 'production',  // HTTPS only in production
+      sameSite: 'Lax',                   // Allow cross-site cookies
+      maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 days in milliseconds
+      path: '/'                          // Available on all routes
+    });
+
+    console.log('✅ Login successful, cookie set:', token.substring(0, 10) + '...');
+
     res.json({
-      message: "Login successful",
-      user: { id: user._id, name: user.name, email: user.email },
+      success: true,
+      message: 'Login successful',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
     });
   } catch (err) {
-    console.error("❌ Login error:", err.message);
-    res.status(500).json({ error: "Server error during login" });
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
   }
 };
+

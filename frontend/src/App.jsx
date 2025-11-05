@@ -15,6 +15,8 @@ import Contact from './components/Contact'
 import Terms from './components/Terms'
 import Footer from './components/Footer'
 import PersonalityReport from './pages/PersonalityReport';
+import PersonalityReportDisplay from './pages/PersonalityReport';
+import PersonalityReportPage from "./pages/PersonalityReportPage";
 
 export default function App() {
   return (
@@ -39,7 +41,8 @@ export default function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
-            <Route path="/personality-report" element={<PersonalityReport />} />
+            <Route path="/personality-report" element={<PersonalityReportDisplay />} />
+            <Route path="/personality-report/:userId" element={<PersonalityReportPage />} />
           </Routes>
         </main>
 
