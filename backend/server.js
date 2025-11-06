@@ -9,7 +9,7 @@ require('dotenv').config();
 
 // Route imports
 const compatibilityRoutes = require("./routes/compatibility");
-const personalityRoutes = require("./routes/personality");
+const personalityRoutes = require("./routes/personalityReport");
 const userRoutes = require('./routes/users');
 const profileRoutes = require('./routes/profile');
 const authRoutes = require('./routes/auth');
@@ -50,13 +50,25 @@ io.on('connection', (socket) => {
 });
 
 // ✅ Middleware
+// app.use(cors({
+//   origin: [
+//     'http://localhost:5173',
+//     'https://amorateams.netlify.app',
+//     'https://www.amoraonline.in'
+//   ],
+//   credentials: true
+// }));
+
+// ✅ CORS must come BEFORE routes
 app.use(cors({
   origin: [
     'http://localhost:5173',
     'https://amorateams.netlify.app',
     'https://www.amoraonline.in'
   ],
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
 // app.use(cors({

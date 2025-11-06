@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 // ✅ OTP limiter: max 3 requests per 10 minutes per IP
 const otpLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 20,
+  max: 40,
   message: { error: "Too many OTP requests. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,

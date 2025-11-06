@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-// eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Box,
@@ -14,8 +14,10 @@ import {
   Alert,
   Tabs,
   Tab,
+  Button,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
+// add with other imports
 const MotionBox = motion(Box);
 
 // Icons
@@ -38,8 +40,8 @@ import GroupsIcon from "@mui/icons-material/Groups";
 
 const GradientBackground = styled(Box)(({ theme }) => ({
   minHeight: "100vh",
-  paddingTop: theme.spacing(15),
-  paddingBottom: theme.spacing(12),
+  paddingTop: theme.spacing(12),
+  paddingBottom: theme.spacing(10),
   background: "linear-gradient(to bottom right, #fce4ec, #f3e5f5, #e3f2fd)",
 }));
 
@@ -50,7 +52,7 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)(
     fontSize: theme.typography.pxToRem(15),
     marginRight: theme.spacing(1),
     color: theme.palette.text.primary,
-    padding: theme.spacing(1.5, 4),
+    padding: theme.spacing(1.2, 3),
     borderRadius: "9999px",
     "&.Mui-selected": {
       background: "linear-gradient(to right, #ec4899, #a855f7)",
@@ -67,7 +69,7 @@ const DetailedInsightCard = ({ icon, title, description, sections }) => (
   <Paper
     elevation={4}
     sx={{
-      p: { xs: 3, md: 4 },
+      p: { xs: 2.5, md: 4 },
       borderRadius: 6,
       background: "linear-gradient(to bottom right, #ffffff, #f9fafb)",
       borderLeft: "4px solid",
@@ -76,19 +78,19 @@ const DetailedInsightCard = ({ icon, title, description, sections }) => (
     }}
   >
     <Typography
-      variant="h5"
+      variant="h6"
       fontWeight="bold"
       display="flex"
       alignItems="center"
-      gap={2}
-      mb={2}
+      gap={1}
+      mb={1}
     >
       {icon} {title}
     </Typography>
     <Typography color="text.secondary" lineHeight={1.7} mb={2}>
       {description || "No data available."}
     </Typography>
-    {sections && (
+    {sections && sections.length > 0 && (
       <Box mt={2} display="flex" flexWrap="wrap" gap={1}>
         {sections.map((section, idx) => (
           <Chip key={idx} label={section} size="small" variant="outlined" />
@@ -98,7 +100,7 @@ const DetailedInsightCard = ({ icon, title, description, sections }) => (
   </Paper>
 );
 
-// Enneagram type -> common name map
+// Enneagram names
 const ENNEAGRAM_NAMES = {
   1: "Type 1 — The Reformer",
   2: "Type 2 — The Helper",
@@ -111,61 +113,87 @@ const ENNEAGRAM_NAMES = {
   9: "Type 9 — The Peacemaker",
 };
 
-export default function PersonalityReportDisplay() {
+export default function PersonalityReportPage() {
+  const { userId } = useParams(); // optional route param
+  const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [error, setError] = useState(null);
 
-  const API_URL = import.meta.env.VITE_API_URL;
+  // fetch report (either my-report or :userId)
   const fetchReport = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get(`${API_URL}/api/personality/my-report`, {
-        withCredentials: true,
-      });
-      setReport(response.data.report);
+      const endpoint = userId
+        ? `${API_URL.replace(/\/$/, "")}/api/personality/${userId}`
+        : `${API_URL.replace(/\/$/, "")}/api/personality/my-report`;
+      const res = await axios.get(endpoint, { withCredentials: true });
+      const payload = res?.data?.report ?? res?.data;
+      if (!payload) {
+        setReport(null);
+        setError(
+          userId
+            ? "No personality report available for this user."
+            : "No personality report available. Generate one first."
+        );
+      } else {
+        const normalized = normalizeServerReport(payload);
+        setReport(normalized);
+      }
     } catch (err) {
+      console.error("Error loading personality report:", err);
       if (
         err?.response?.status === 404 ||
         err?.response?.data?.code === "REPORT_NOT_GENERATED"
       ) {
-        setError("Generate your personalized report");
+        setError(
+          userId
+            ? "This user hasn't generated a public personality report."
+            : "Generate your personalized report"
+        );
+        setReport(null);
       } else {
-        setError(err?.response?.data?.error || "Failed to fetch report");
+        setError(err?.response?.data?.error || "Failed to load report.");
       }
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, [API_URL, userId]);
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
 
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
 
+  // generate report (only allowed when viewing your own report)
   const generateReport = async () => {
+    if (userId) return;
+    setGenerating(true);
+    setError(null);
     try {
-      setGenerating(true);
-      setError(null);
       await axios.post(
-        `${API_URL}/api/personality/generate-report`,
+        `${API_URL.replace(/\/$/, "")}/api/personality/generate-report`,
         {},
         { withCredentials: true }
       );
       await fetchReport();
     } catch (err) {
+      console.error("Generate report error:", err);
       setError(err?.response?.data?.error || "Failed to generate report");
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-  };
-
+  // Loading / generating UI
   if (loading || generating) {
     return (
       <GradientBackground
@@ -193,7 +221,7 @@ export default function PersonalityReportDisplay() {
           </Typography>
           {generating && (
             <Typography variant="body2" color="text.secondary" mt={1}>
-              This will take 15-30 seconds.
+              This may take ~15–30 seconds.
             </Typography>
           )}
         </Box>
@@ -201,6 +229,7 @@ export default function PersonalityReportDisplay() {
     );
   }
 
+  // Error / empty states
   if (!report && error) {
     return (
       <GradientBackground
@@ -227,24 +256,28 @@ export default function PersonalityReportDisplay() {
             {error}
           </Typography>
           <Typography color="text.secondary" mb={3}>
-            Complete the personality quiz and let our AI generate your unique,
-            personalized report.
+            {userId
+              ? "This user has not generated a public personality report."
+              : "Complete the personality quiz and let our AI generate your unique report."}
           </Typography>
-          <button
-            onClick={generateReport}
-            disabled={generating}
-            style={{
-              background: "linear-gradient(to right, #ec4899, #a855f7)",
-              color: "#fff",
-              borderRadius: 12,
-              padding: "12px 28px",
-              fontWeight: 700,
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            {generating ? "Generating..." : "Generate Report"}
-          </button>
+
+          <Box display="flex" justifyContent="center" gap={2}>
+            <Button variant="outlined" onClick={() => navigate(-1)}>
+              Back
+            </Button>
+            {!userId && (
+              <Button
+                onClick={generateReport}
+                disabled={generating}
+                variant="contained"
+                sx={{
+                  background: "linear-gradient(to right, #ec4899, #a855f7)",
+                }}
+              >
+                {generating ? "Generating..." : "Generate Report"}
+              </Button>
+            )}
+          </Box>
         </Paper>
       </GradientBackground>
     );
@@ -264,10 +297,10 @@ export default function PersonalityReportDisplay() {
     );
   }
 
-  // Pull values with defensive fallbacks
+  // --- We have a normalized report object
   const { personalityProfile, detailedReport = {}, scores = {} } = report;
 
-  // normalized nested fields (API-first). Provide tasteful dummy content when empty.
+  // derived arrays with safe defaults / dummies
   const strengthsRaw =
     detailedReport?.detailedInsights?.strengths ??
     detailedReport?.detailedReport?.detailedInsights?.strengths ??
@@ -279,10 +312,12 @@ export default function PersonalityReportDisplay() {
     report?.aiGeneratedReport?.developmentAreas ??
     [];
   const conversationStartersRaw =
+    detailedReport?.conversationStarters ??
     detailedReport?.detailedReport?.conversationStarters ??
     report?.aiGeneratedReport?.conversationStarters ??
     [];
   const dateIdeasRaw =
+    detailedReport?.dateIdeas ??
     detailedReport?.detailedReport?.dateIdeas ??
     report?.aiGeneratedReport?.dateIdeas ??
     [];
@@ -292,13 +327,10 @@ export default function PersonalityReportDisplay() {
     report?.aiGeneratedReport?.actionItems ??
     [];
   const suggestedCareersRaw =
-    detailedReport?.careerGuidance?.suggestedCareers ?? [];
-  const careerSummaryRaw =
-    detailedReport?.careerGuidance?.summary ??
-    detailedReport?.careerGuidance?.workEnvironment ??
-    "";
+    detailedReport?.careerGuidance?.suggestedCareers ??
+    detailedReport?.detailedReport?.careerGuidance?.suggestedCareers ??
+    [];
 
-  // tasteful dummy defaults (only used when API returns no content)
   const DUMMY_STRENGTHS = [
     "Curious and open to new ideas",
     "Reliable — people trust you to follow through",
@@ -334,7 +366,6 @@ export default function PersonalityReportDisplay() {
     "Product, Research, Education",
   ];
 
-  // Choose final arrays (prefer real data; otherwise use dummies)
   const strengths = strengthsRaw.length ? strengthsRaw : DUMMY_STRENGTHS;
   const developmentAreas = developmentAreasRaw.length
     ? developmentAreasRaw
@@ -348,16 +379,15 @@ export default function PersonalityReportDisplay() {
     ? suggestedCareersRaw
     : DUMMY_CAREERS;
   const careerSummary =
-    careerSummaryRaw ||
-    "Profiles like yours do well in roles that value creativity, steady execution, and strong interpersonal skills.";
+    detailedReport?.careerGuidance?.summary ??
+    detailedReport?.careerGuidance?.workEnvironment ??
+    "Profiles like yours do well in roles that value creativity and steady execution.";
 
-  // Enneagram: show name if available
   const enneType =
     detailedReport?.enneagramAnalysis?.type ??
     report?.enneagramType ??
     report?.aiGeneratedReport?.enneagramType ??
     null;
-
   const enneName =
     detailedReport?.enneagramAnalysis?.name ??
     (enneType ? ENNEAGRAM_NAMES[String(enneType)] ?? `Type ${enneType}` : null);
@@ -415,46 +445,58 @@ export default function PersonalityReportDisplay() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Box textAlign="center" mb={6}>
-            <p className="text-sm text-purple-600">
+          <Box textAlign="center" mb={4}>
+            <Typography variant="subtitle2" sx={{ color: "#7c3aed", mb: 1 }}>
               ✨ Deeply personalized insights based on your unique psychology
-            </p>
-            {/* <Box display="flex" justifyContent="center" gap={2} flexWrap="wrap">
-                            <Chip icon={<PsychologyIcon />} label="Psychology-Based" variant="outlined" sx={{ bgcolor: 'white' }} />
-                            <Chip icon={<FavoriteIcon />} label="Dating Optimized" variant="outlined" sx={{ bgcolor: 'white' }} />
-                            <Chip icon={<TrackChangesIcon />} label="AI Generated" variant="outlined" sx={{ bgcolor: 'white' }} />
-                        </Box> */}
+            </Typography>
+            <Box
+              display="flex"
+              justifyContent="center"
+              gap={2}
+              alignItems="center"
+              flexWrap="wrap"
+            >
+              <Button onClick={() => navigate(-1)} variant="outlined">
+                Back
+              </Button>
+              {!userId && (
+                <Button
+                  onClick={generateReport}
+                  variant="contained"
+                  sx={{
+                    background: "linear-gradient(to right, #ec4899, #a855f7)",
+                  }}
+                >
+                  {generating ? "Generating..." : "Generate Report"}
+                </Button>
+              )}
+            </Box>
           </Box>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
         >
           <Paper
-            elevation={12}
-            sx={{
-              p: { xs: 3, md: 8 },
-              mb: 8,
-              borderRadius: "24px",
-              boxShadow: "0 25px 50px -12px rgb(0 0 0 / 0.25)",
-            }}
+            elevation={10}
+            sx={{ p: { xs: 3, md: 8 }, mb: 6, borderRadius: "20px" }}
           >
-            <Box textAlign="center" mb={6}>
+            <Box textAlign="center" mb={3}>
               <Typography
                 variant="h4"
-                component="h2"
                 fontWeight="bold"
-                mb={1}
                 sx={{
                   background: "linear-gradient(to right, #ec4899, #a855f7)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                 }}
               >
-                {detailedReport?.summary?.headline ?? "Your Personality"}
+                {detailedReport?.summary?.headline ??
+                  personalityProfile ??
+                  "Personality Report"}
               </Typography>
-              <Typography variant="subtitle1" color="text.secondary" mb={2}>
+              <Typography variant="subtitle1" color="text.secondary" mb={1}>
                 {detailedReport?.summary?.tagline ?? ""}
               </Typography>
               <Typography
@@ -465,29 +507,30 @@ export default function PersonalityReportDisplay() {
                 lineHeight={1.7}
               >
                 {detailedReport?.summary?.description ??
-                  "A concise summary of your personality will appear here once the report is available."}
+                  "A concise summary of your personality appears here."}
               </Typography>
             </Box>
 
-            <Box mt={6} pt={6} borderTop="2px solid" borderColor="grey.200">
+            <Box mt={4} pt={4} borderTop="1px solid" borderColor="grey.200">
               <Typography
-                variant="h5"
+                variant="h6"
                 fontWeight="bold"
                 color="text.primary"
-                mb={4}
+                mb={3}
                 textAlign="center"
               >
                 Your Big Five Personality Profile
               </Typography>
-              <Grid container spacing={4} justifyContent="center">
+
+              <Grid container spacing={3} justifyContent="center">
                 {Object.entries(scores ?? {}).length ? (
                   Object.entries(scores ?? {}).map(
                     ([dimension, score], index) => (
-                      <Grid item xs={12} sm={4} md={2.4} key={dimension}>
+                      <Grid item xs={12} sm={6} md={2.4} key={dimension}>
                         <motion.div
-                          initial={{ opacity: 0, y: 20 }}
+                          initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1 * index }}
+                          transition={{ delay: 0.05 * index }}
                         >
                           <Box textAlign="center">
                             <Box
@@ -495,23 +538,19 @@ export default function PersonalityReportDisplay() {
                               display="inline-flex"
                               justifyContent="center"
                               alignItems="center"
-                              height={140}
-                              width={140}
-                              mb={2}
-                              sx={{
-                                transition: "transform 0.3s",
-                                "&:hover": { transform: "scale(1.05)" },
-                              }}
+                              height={120}
+                              width={120}
+                              mb={1.5}
                             >
                               <svg
-                                width="140"
-                                height="140"
+                                width="120"
+                                height="120"
                                 viewBox="0 0 160 160"
                                 style={{ transform: "rotate(-90deg)" }}
                               >
                                 <defs>
                                   <linearGradient
-                                    id={`gradient-${dimension}`}
+                                    id={`grad-${dimension}`}
                                     x1="0%"
                                     y1="0%"
                                     x2="100%"
@@ -534,7 +573,7 @@ export default function PersonalityReportDisplay() {
                                   cy="80"
                                   r="70"
                                   fill="none"
-                                  stroke={`url(#gradient-${dimension})`}
+                                  stroke={`url(#grad-${dimension})`}
                                   strokeWidth="10"
                                   strokeLinecap="round"
                                   strokeDasharray={440}
@@ -543,15 +582,11 @@ export default function PersonalityReportDisplay() {
                                     strokeDashoffset:
                                       440 - ((score ?? 0) / 100) * 440,
                                   }}
-                                  transition={{ duration: 1.2, delay: 0.15 }}
+                                  transition={{ duration: 1.2, delay: 0.1 }}
                                 />
                               </svg>
                               <Box position="absolute" textAlign="center">
-                                <Typography
-                                  variant="h5"
-                                  fontWeight="bold"
-                                  color="text.primary"
-                                >
+                                <Typography variant="h6" fontWeight="bold">
                                   {Math.round(score ?? 0)}
                                 </Typography>
                                 <Typography
@@ -563,7 +598,7 @@ export default function PersonalityReportDisplay() {
                               </Box>
                             </Box>
                             <Typography
-                              variant="subtitle1"
+                              variant="subtitle2"
                               textTransform="capitalize"
                               fontWeight="bold"
                             >
@@ -574,7 +609,6 @@ export default function PersonalityReportDisplay() {
                               size="small"
                               sx={{
                                 mt: 1,
-                                mb: 1,
                                 bgcolor: getScoreLevel(score ?? 0).color,
                                 color: "white",
                                 fontWeight: "bold",
@@ -584,6 +618,7 @@ export default function PersonalityReportDisplay() {
                               variant="caption"
                               display="block"
                               color="text.secondary"
+                              mt={0.5}
                             >
                               {getScoreInterpretation(dimension, score ?? 0)}
                             </Typography>
@@ -593,7 +628,6 @@ export default function PersonalityReportDisplay() {
                     )
                   )
                 ) : (
-                  // If scores absent, show a friendly placeholder
                   <Grid item xs={12}>
                     <Paper sx={{ p: 3, textAlign: "center" }}>
                       <Typography variant="h6" fontWeight="bold">
@@ -617,10 +651,10 @@ export default function PersonalityReportDisplay() {
             justifyContent="center"
             sx={{
               position: "sticky",
-              top: 24,
+              top: 88, // ← increased so sticky tabs leave more room
               zIndex: 10,
               py: 2,
-              background: "rgba(243, 239, 247, 0.8)",
+              background: "rgba(243, 239, 247, 0.85)",
               backdropFilter: "blur(6px)",
               borderRadius: "9999px",
             }}
@@ -652,27 +686,23 @@ export default function PersonalityReportDisplay() {
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.25 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
           >
             <Box mt={2}>
               {activeTab === 0 && (
-                <Grid container spacing={4}>
+                <Grid container spacing={3}>
                   <Grid item xs={12}>
                     <Paper
-                      elevation={4}
-                      sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 6 }}
+                      elevation={3}
+                      sx={{ p: { xs: 2, md: 3 }, borderRadius: 4 }}
                     >
-                      <Typography variant="h5" fontWeight="bold" mb={2}>
+                      <Typography variant="h6" fontWeight="bold" mb={1}>
                         About You
                       </Typography>
-                      <Typography
-                        variant="body1"
-                        color="text.secondary"
-                        lineHeight={1.7}
-                      >
+                      <Typography color="text.secondary" lineHeight={1.7}>
                         {detailedReport?.personalityNarrative ??
                           "We don't have a narrative yet — generate your report to see a full personalized narrative."}
                       </Typography>
@@ -681,30 +711,30 @@ export default function PersonalityReportDisplay() {
 
                   <Grid item xs={12} md={6}>
                     <Paper
-                      elevation={4}
+                      elevation={3}
                       sx={{
-                        p: { xs: 2.5, md: 3 },
-                        borderRadius: 6,
+                        p: 2.5,
+                        borderRadius: 4,
                         height: "100%",
                         background:
                           "linear-gradient(to bottom right, #f0fdf4, #dcfce7)",
                       }}
                     >
                       <Typography
-                        variant="h6"
+                        variant="subtitle1"
                         fontWeight="bold"
                         color="#14532d"
                         display="flex"
                         alignItems="center"
                         gap={1}
-                        mb={2}
+                        mb={1}
                       >
                         <CheckCircleOutlineIcon /> Your Strengths
                       </Typography>
-                      <ul style={{ paddingLeft: 20 }}>
+                      <ul style={{ paddingLeft: 18 }}>
                         {strengths.map((s, i) => (
                           <li key={i}>
-                            <Typography color="text.secondary" mb={1}>
+                            <Typography color="text.secondary" mb={0.6}>
                               {s}
                             </Typography>
                           </li>
@@ -715,30 +745,30 @@ export default function PersonalityReportDisplay() {
 
                   <Grid item xs={12} md={6}>
                     <Paper
-                      elevation={4}
+                      elevation={3}
                       sx={{
-                        p: { xs: 2.5, md: 3 },
-                        borderRadius: 6,
+                        p: 2.5,
+                        borderRadius: 4,
                         height: "100%",
                         background:
                           "linear-gradient(to bottom right, #eff6ff, #dbeafe)",
                       }}
                     >
                       <Typography
-                        variant="h6"
+                        variant="subtitle1"
                         fontWeight="bold"
                         color="#1e3a8a"
                         display="flex"
                         alignItems="center"
                         gap={1}
-                        mb={2}
+                        mb={1}
                       >
                         <TrendingUpIcon /> Growth Areas
                       </Typography>
-                      <ul style={{ paddingLeft: 20 }}>
+                      <ul style={{ paddingLeft: 18 }}>
                         {developmentAreas.map((a, i) => (
                           <li key={i}>
-                            <Typography color="text.secondary" mb={1}>
+                            <Typography color="text.secondary" mb={0.6}>
                               {a}
                             </Typography>
                           </li>
@@ -815,17 +845,14 @@ export default function PersonalityReportDisplay() {
               )}
 
               {activeTab === 2 && (
-                <Paper
-                  elevation={4}
-                  sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 6 }}
-                >
-                  <Typography variant="h5" fontWeight="bold" mb={2}>
+                <Paper elevation={3} sx={{ p: 3, borderRadius: 4 }}>
+                  <Typography variant="h6" fontWeight="bold" mb={1}>
                     Career Guidance
                   </Typography>
-                  <Typography color="text.secondary" mb={3} lineHeight={1.7}>
+                  <Typography color="text.secondary" mb={2}>
                     {careerSummary}
                   </Typography>
-                  <Box display="flex" flexWrap="wrap" gap={1.5}>
+                  <Box display="flex" flexWrap="wrap" gap={1}>
                     {suggestedCareers.map((c, i) => (
                       <Chip
                         key={i}
@@ -842,14 +869,11 @@ export default function PersonalityReportDisplay() {
               )}
 
               {activeTab === 3 && (
-                <Paper
-                  elevation={4}
-                  sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 6 }}
-                >
-                  <Typography variant="h5" fontWeight="bold" mb={2}>
+                <Paper elevation={3} sx={{ p: 2.5, borderRadius: 4 }}>
+                  <Typography variant="h6" fontWeight="bold" mb={2}>
                     Relationship Insights
                   </Typography>
-                  <Grid container spacing={3}>
+                  <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
                       <DetailedInsightCard
                         icon={<QuestionAnswerIcon />}
@@ -895,19 +919,19 @@ export default function PersonalityReportDisplay() {
               )}
 
               {activeTab === 4 && (
-                <Grid container spacing={3}>
+                <Grid container spacing={2}>
                   <Grid item xs={12} lg={7}>
                     <Paper
-                      elevation={4}
+                      elevation={3}
                       sx={{
-                        p: { xs: 2.5, md: 4 },
-                        borderRadius: 6,
+                        p: 2.5,
+                        borderRadius: 4,
                         background:
                           "linear-gradient(to bottom right, #fff1f2, #ffe4e6)",
                       }}
                     >
                       <Typography
-                        variant="h5"
+                        variant="h6"
                         fontWeight="bold"
                         mb={1}
                         color="#831843"
@@ -917,31 +941,24 @@ export default function PersonalityReportDisplay() {
                       >
                         <FavoriteIcon /> Your Ideal Partner
                       </Typography>
-                      <Typography
-                        variant="body1"
-                        color="text.secondary"
-                        lineHeight={1.7}
-                      >
+                      <Typography variant="body2" color="text.secondary">
                         {detailedReport?.relationshipInsights
                           ?.idealPartnerProfile ??
-                          "We don't have a specific ideal partner description yet — try generating the report for a tailored match profile."}
+                          "We don't have a specific ideal partner description yet — generate the report for a tailored match profile."}
                       </Typography>
                     </Paper>
                   </Grid>
 
                   <Grid item xs={12} lg={5}>
-                    <Paper
-                      elevation={4}
-                      sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 6 }}
-                    >
-                      <Typography variant="h6" fontWeight="bold" mb={1}>
+                    <Paper elevation={3} sx={{ p: 2.5, borderRadius: 4 }}>
+                      <Typography variant="subtitle1" fontWeight="bold" mb={1}>
                         Conversation Starters
                       </Typography>
                       {conversationStarters.length ? (
-                        <ul style={{ paddingLeft: 20 }}>
+                        <ul style={{ paddingLeft: 18 }}>
                           {conversationStarters.map((s, i) => (
                             <li key={i}>
-                              <Typography color="text.secondary" mb={1}>
+                              <Typography color="text.secondary" mb={0.6}>
                                 {s}
                               </Typography>
                             </li>
@@ -956,11 +973,8 @@ export default function PersonalityReportDisplay() {
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Paper
-                      elevation={4}
-                      sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 6 }}
-                    >
-                      <Typography variant="h6" fontWeight="bold" mb={2}>
+                    <Paper elevation={3} sx={{ p: 2.5, borderRadius: 4 }}>
+                      <Typography variant="subtitle1" fontWeight="bold" mb={1}>
                         Ideal Date Ideas
                       </Typography>
                       {dateIdeas.length ? (
@@ -969,7 +983,7 @@ export default function PersonalityReportDisplay() {
                             <Grid item xs={12} md={6} key={idx}>
                               <Paper
                                 variant="outlined"
-                                sx={{ p: 2, borderRadius: 4 }}
+                                sx={{ p: 1.5, borderRadius: 2 }}
                               >
                                 <Typography fontWeight="bold">
                                   {date?.idea ?? date}
@@ -998,46 +1012,37 @@ export default function PersonalityReportDisplay() {
 
               {activeTab === 5 && (
                 <Paper
-                  elevation={4}
-                  sx={{
-                    p: { xs: 2.5, md: 4 },
-                    borderRadius: 6,
-                    textAlign: "center",
-                  }}
+                  elevation={3}
+                  sx={{ p: 2.5, borderRadius: 4, textAlign: "center" }}
                 >
-                  <Typography variant="h5" fontWeight="bold" mb={2}>
+                  <Typography variant="h6" fontWeight="bold" mb={1}>
                     Enneagram Analysis
                   </Typography>
-                  <Box
-                    sx={{
-                      my: 3,
-                      p: 2,
-                      display: "inline-block",
-                      background: "linear-gradient(to right, #fde68a, #f59e0b)",
-                      borderRadius: "100%",
-                      color: "#78350f",
-                    }}
-                  >
-                    <Typography variant="h3" component="div" fontWeight="bold">
-                      {enneType ?? "N/A"}
-                    </Typography>
+                  <Box sx={{ my: 2 }}>
+                    <Box
+                      sx={{
+                        display: "inline-block",
+                        background:
+                          "linear-gradient(to right, #fde68a, #f59e0b)",
+                        borderRadius: "100%",
+                        p: 2,
+                      }}
+                    >
+                      <Typography variant="h4" fontWeight="bold">
+                        {enneType ?? "N/A"}
+                      </Typography>
+                    </Box>
                   </Box>
-                  <Typography variant="h6" fontWeight="bold" mb={1}>
+                  <Typography variant="subtitle1" fontWeight="bold" mb={1}>
                     {enneName ?? "Enneagram type not available"}
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    mt={1}
-                    mb={2}
-                  >
+                  <Typography variant="body2" color="text.secondary" mb={1}>
                     {detailedReport?.enneagramAnalysis?.description ??
-                      "No additional description available for this Enneagram type."}
+                      "No additional description available."}
                   </Typography>
                   <Alert severity="info" icon={<MenuBookIcon />}>
-                    The Enneagram is a powerful personality system describing
-                    nine distinct types. Your type represents your core
-                    motivation.
+                    The Enneagram is a personality system describing nine
+                    distinct types. Your type represents your core motivation.
                   </Alert>
                 </Paper>
               )}
@@ -1045,7 +1050,8 @@ export default function PersonalityReportDisplay() {
           </motion.div>
         </AnimatePresence>
 
-        <MotionBox
+        
+          <MotionBox
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.12 }}
@@ -1117,8 +1123,9 @@ export default function PersonalityReportDisplay() {
               </Grid>
             </Paper>
           </MotionBox>
+        
 
-        <Box textAlign="center" my={6}>
+        <Box textAlign="center" my={4}>
           <Typography color="text.secondary" maxWidth="md" mx="auto">
             Your personality profile is your roadmap to better relationships and
             personal growth. Use these insights to understand yourself and
@@ -1128,4 +1135,104 @@ export default function PersonalityReportDisplay() {
       </Container>
     </GradientBackground>
   );
+}
+
+/* --------------------------
+   Normalization helper (adapted from your earlier function)
+   Attempts to produce: { personalityProfile, detailedReport, scores }
+   -------------------------- */
+function normalizeServerReport(payload) {
+  if (!payload) return null;
+
+  // If already normalized
+  if (payload.personalityProfile && payload.detailedReport && payload.scores) {
+    return payload;
+  }
+
+  // If payload is an object with aiGeneratedReport or similar fields
+  if (
+    payload.aiGeneratedReport ||
+    payload.personalityNarrative ||
+    payload.personalityType
+  ) {
+    const ai = payload.aiGeneratedReport ?? payload;
+    const detailedReport = {
+      summary: {
+        headline: ai.personalityType?.name ?? payload.personalityProfile ?? "",
+        tagline: ai.personalityType?.description ?? "",
+        description: ai.personalityNarrative ?? ai.summary ?? "",
+      },
+      personalityNarrative:
+        ai.personalityNarrative ?? payload.personalityNarrative ?? "",
+      detailedInsights: {
+        strengths: ai.strengths ?? [],
+        developmentAreas: ai.developmentAreas ?? [],
+        communicationStyle: ai.communicationStyle ?? "",
+        stressResponse: ai.stressResponse ?? "",
+        decisionMakingStyle:
+          ai.decisionMakingStyle ?? ai.conflictResolutionStyle ?? "",
+        workStyle: ai.workStyle ?? "",
+      },
+      careerGuidance: {
+        suggestedCareers: ai.careerSuggestions ?? ai.suggestedCareers ?? [],
+        workEnvironment: ai.workEnvironment ?? "",
+        leadershipStyle: ai.leadershipStyle ?? "",
+      },
+      relationshipInsights: {
+        communicationNeeds: ai.relationshipApproach ?? "",
+        conflictStyle: ai.conflictResolutionStyle ?? "",
+        intimacyPreference: ai.intimacyPreference ?? "",
+        partnerCompatibility: (ai.compatibleTypes ?? []).join(", "),
+        idealPartnerProfile: ai.idealPartnerProfile ?? "",
+      },
+      enneagramAnalysis: {
+        type: payload.enneagramType ?? ai.enneagramType ?? null,
+        name: payload.enneagramName ?? ai.enneagramName ?? "",
+        description: ai.personalityNarrative ?? "",
+      },
+      actionItems: ai.actionItems ?? [],
+      conversationStarters: ai.conversationStarters ?? [],
+      dateIdeas: ai.dateIdeas ?? [],
+    };
+
+    return {
+      personalityProfile:
+        ai.personalityType?.name ?? payload.personalityProfile ?? "Personality",
+      detailedReport,
+      scores: payload.bigFive ?? ai.bigFive ?? payload.scores ?? {},
+    };
+  }
+
+  // Generic mapping for other shapes
+  const maybeReport = payload.report ?? payload;
+  return {
+    personalityProfile:
+      maybeReport.personalityProfile ??
+      maybeReport.personalityType?.name ??
+      maybeReport.aiGeneratedReport?.personalityType?.name ??
+      "Personality",
+    detailedReport: maybeReport.detailedReport ??
+      maybeReport.aiGeneratedReport ?? {
+        summary: {
+          headline: maybeReport.aiGeneratedReport?.personalityType?.name ?? "",
+          tagline:
+            maybeReport.aiGeneratedReport?.personalityType?.description ?? "",
+          description:
+            maybeReport.aiGeneratedReport?.personalityNarrative ?? "",
+        },
+        personalityNarrative:
+          maybeReport.aiGeneratedReport?.personalityNarrative ?? "",
+        detailedInsights: {
+          strengths: maybeReport.aiGeneratedReport?.strengths ?? [],
+          developmentAreas:
+            maybeReport.aiGeneratedReport?.developmentAreas ?? [],
+        },
+        actionItems: maybeReport.aiGeneratedReport?.actionItems ?? [],
+      },
+    scores:
+      maybeReport.scores ??
+      maybeReport.bigFive ??
+      maybeReport.aiGeneratedReport?.bigFive ??
+      {},
+  };
 }
