@@ -50,36 +50,29 @@ io.on('connection', (socket) => {
 });
 
 // ✅ Middleware
-// app.use(cors({
-//   origin: [
-//     'http://localhost:5173',
-//     'https://amorateams.netlify.app',
-//     'https://www.amoraonline.in'
-//   ],
-//   credentials: true
-// }));
+// ✅ CORS setup (must come before routes)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://amorateams.netlify.app',
+  'https://www.amoraonline.in'
+];
 
-// ✅ CORS must come BEFORE routes
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://amorateams.netlify.app',
-    'https://www.amoraonline.in'
-  ],
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-}));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
 
-// app.use(cors({
-//   origin: "http://localhost:5173", // your frontend URL
-//   credentials: true                // allow cookies, authorization headers
-// }));
-// // ✅ Handle preflight (OPTIONS) requests properly
-// app.options('*', cors({
-//   origin: "http://localhost:5173",
-//   credentials: true
-// }));
+  // ✅ Handle preflight (OPTIONS) requests immediately
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 
 app.use(express.json());
 app.use(cookieParser());
