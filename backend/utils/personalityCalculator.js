@@ -1,6 +1,14 @@
+// ============================================================================
+// UPDATED PERSONALITY CALCULATOR - FOR 26-QUESTION RESTRUCTURED SYSTEM
+// Pure JavaScript - Works with reorganized questions (TEXT → BUBBLE → DEALBREAKER)
+// ============================================================================
+
 class PersonalityCalculator {
   // ==================== BIG FIVE CALCULATION ====================
-  
+  /**
+   * Updated mapping for 26 REORGANIZED questions
+   * IDs match the restructured question array
+   */
   calculateBigFive(answers) {
     const scores = {
       openness: 0,
@@ -11,350 +19,428 @@ class PersonalityCalculator {
     };
 
     const questionMappings = {
-      // Openness questions (IDs: 12, 14, 2, 5 from personality report quiz)
+      // Openness: Risk-taking (Q12) + Weekend preferences (Q18)
       openness: {
-        questions: [101, 102, 103, 104, 105],
-        weight: 1
+        questions: [12, 18],
+        weights: [1, 0.7],
+        type: 'mixed'
       },
-      // Conscientiousness
+
+      // Conscientiousness: Planning (Q16) + Logic-based decisions (Q14)
       conscientiousness: {
-        questions: [106, 107, 108, 109],
-        weight: 1
+        questions: [16, 14],
+        weights: [1, 0.9],
+        type: 'direct'
       },
-      // Extraversion
+
+      // Extraversion: Center of attention (Q10) + Social situations (Q11)
       extraversion: {
-        questions: [110, 111, 112, 113],
-        weight: 1
+        questions: [10, 11],
+        weights: [1, 0.8],
+        type: 'direct'
       },
-      // Agreeableness
+
+      // Agreeableness: Empathy (Q13) + Compromising beliefs (Q20) + Conflict handling (Q4)
       agreeableness: {
-        questions: [114, 115, 116, 117],
-        weight: 1
+        questions: [13, 20, 4],
+        weights: [1, -0.8, 0.6], // Q20 is reversed (negative weight)
+        type: 'mixed'
       },
-      // Neuroticism (emotional stability - reverse scored)
+
+      // Neuroticism: Stress response (Q15) + Reassurance need (Q6) + Anxiety from no contact (Q19)
       neuroticism: {
-        questions: [118, 119, 120],
-        weight: 1,
-        reverseScore: true
+        questions: [15, 6, 19],
+        weights: [1, 0.7, 0.8],
+        type: 'direct'
       }
     };
 
     // Calculate each dimension
     Object.keys(questionMappings).forEach(dimension => {
       const mapping = questionMappings[dimension];
-      let total = 0;
-      let count = 0;
+      let totalWeightedScore = 0;
+      let totalWeight = 0;
 
-      mapping.questions.forEach(questionId => {
+      mapping.questions.forEach((questionId, index) => {
         const answer = answers[questionId];
         if (answer !== undefined) {
-          let score = answer;
+          // Normalize answer to 0-100 scale
+          let normalizedScore = this.normalizeAnswer(answer, questionId);
           
-          // Reverse scoring for neuroticism
-          if (mapping.reverseScore) {
-            score = 6 - answer; // Assuming 1-5 scale
+          // Apply weight (can be negative for reversed scoring)
+          const weight = mapping.weights[index];
+          if (weight < 0) {
+            normalizedScore = 100 - normalizedScore;
           }
           
-          total += score;
-          count++;
+          totalWeightedScore += normalizedScore * Math.abs(weight);
+          totalWeight += Math.abs(weight);
         }
       });
 
-      // Normalize to 0-100
-      if (count > 0) {
-        scores[dimension] = Math.round((total / (count * 5)) * 100);
+      // Calculate final score (0-100)
+      if (totalWeight > 0) {
+        scores[dimension] = Math.round(totalWeightedScore / totalWeight);
+        scores[dimension] = Math.max(0, Math.min(100, scores[dimension]));
       }
     });
 
     return scores;
   }
 
-  // ==================== ENNEAGRAM TYPE CALCULATION ====================
+  /**
+   * Normalize different question types to 0-100 scale
+   * Updated for new question structure
+   */
+  normalizeAnswer(answer, questionId) {
+    // BUBBLE questions (5-point Likert scale)
+    const bubbleQuestions = [6, 7, 10, 12, 13, 14, 16, 19, 20, 21, 22, 23];
+    if (bubbleQuestions.includes(questionId)) {
+      // answer: 1 (Strongly Agree) → 100, 5 (Strongly Disagree) → 0
+      return ((6 - answer) / 5) * 100;
+    }
 
-  calculateEnneagramType(bigFive, answers) {
-    const { openness, conscientiousness, extraversion, agreeableness, neuroticism } = bigFive;
+    // QUICK_POLL questions (3-point scale)
+    const quickPollQuestions = [11, 15];
+    if (quickPollQuestions.includes(questionId)) {
+      // answer: 1 → 100, 2 → 50, 3 → 0
+      return ((4 - answer) / 3) * 100;
+    }
 
-    // Enneagram typing logic based on Big Five
-    // This is a simplified mapping - real Enneagram is more complex
+    // EMOJI_SCALE question (4-point scale) - Q2
+    if (questionId === 2) {
+      // answer: 1-4 → normalize to 0-100
+      return ((answer - 1) / 3) * 100;
+    }
 
-    const typeScores = {
-      1: 0, // Reformer - High conscientiousness, low neuroticism
-      2: 0, // Helper - High agreeableness, low openness
-      3: 0, // Achiever - High extraversion, high conscientiousness
-      4: 0, // Individualist - High openness, high neuroticism
-      5: 0, // Investigator - High openness, low extraversion
-      6: 0, // Loyalist - High agreeableness, high neuroticism
-      7: 0, // Enthusiast - High extraversion, high openness
-      8: 0, // Challenger - Low agreeableness, high extraversion
-      9: 0  // Peacemaker - Low neuroticism, low extraversion
+    // TEXT questions - map specific answers to scores
+    return this.normalizeTextAnswer(answer, questionId);
+  }
+
+  /**
+   * Map TEXT question answers to normalized scores
+   * Updated for restructured questions (Q1, Q3, Q4, Q5, Q8, Q9, Q17, Q18, Q24)
+   */
+  normalizeTextAnswer(answer, questionId) {
+    const textMappings = {
+      // Q1: Relationship status (context only, not scored)
+      1: { 1: 50, 2: 50, 3: 50, 4: 50 },
+
+      // Q3: Love expression (compatibility, maps to personality)
+      3: { 1: 75, 2: 85, 3: 90, 4: 80 },
+      
+      // Q4: Conflict handling (maps to agreeableness + neuroticism)
+      4: { 1: 90, 2: 70, 3: 30, 4: 50 },
+      
+      // Q5: Love language (compatibility matching, not scored)
+      5: { 1: 50, 2: 50, 3: 50, 4: 50, 5: 50 },
+      
+      // Q8: Partner upset response (empathy)
+      8: { 1: 100, 2: 60, 3: 70, 4: 30 },
+      
+      // Q9: Emotional vulnerability (attachment)
+      9: { 1: 100, 2: 80, 3: 50, 4: 20 },
+      
+      // Q17: Financial stability (values)
+      17: { 1: 90, 2: 70, 3: 50, 4: 30 },
+      
+      // Q18: Weekend preferences (openness/extraversion)
+      18: { 1: 90, 2: 40, 3: 85, 4: 75 },
+      
+      // Q24: Shared expenses (values)
+      24: { 1: 80, 2: 85, 3: 50, 4: 60 }
     };
 
-    // Type 1: Reformer (Perfectionist)
-    typeScores[1] = (conscientiousness * 0.4) + ((100 - neuroticism) * 0.3) + ((100 - agreeableness) * 0.3);
+    return textMappings[questionId]?.[answer] || 50;
+  }
 
-    // Type 2: Helper (Giver)
-    typeScores[2] = (agreeableness * 0.5) + ((100 - openness) * 0.3) + ((100 - extraversion) * 0.2);
+  // ==================== ATTACHMENT STYLE CALCULATION ====================
+  /**
+   * Enhanced attachment calculation using 8 attachment-specific questions
+   * Updated for new question IDs
+   */
+  calculateAttachmentStyle(answers) {
+    const attachmentIndicators = {
+      reassuranceNeed: answers[6],           // Q6: "I need reassurance regularly"
+      personalSpaceNeed: answers[7],         // Q7: "Personal space is essential"
+      partnerResponseToUpset: answers[8],    // Q8: "When partner upset, I..."
+      emotionalVulnerability: answers[9],    // Q9: "Comfortable with vulnerability"
+      anxietyFromNoContact: answers[19],     // Q19: "Anxious when no contact"
+      frequentCommunication: answers[21],    // Q21: "Need frequent communication"
+      handleProblemsAlone: answers[22],      // Q22: "Handle problems alone"
+      expressNeedsDirectly: answers[23]      // Q23: "Express needs directly"
+    };
 
-    // Type 3: Achiever (Performer)
-    typeScores[3] = (extraversion * 0.4) + (conscientiousness * 0.3) + ((100 - neuroticism) * 0.3);
+    let anxiousScore = 0;
+    let avoidantScore = 0;
+    let secureScore = 0;
 
-    // Type 4: Individualist (Romantic)
-    typeScores[4] = (openness * 0.4) + (neuroticism * 0.3) + ((100 - agreeableness) * 0.3);
+    // === ANXIOUS ATTACHMENT INDICATORS ===
+    if (attachmentIndicators.reassuranceNeed >= 4) anxiousScore += 25;
+    else if (attachmentIndicators.reassuranceNeed >= 3) anxiousScore += 15;
+    
+    if (attachmentIndicators.frequentCommunication >= 4) anxiousScore += 25;
+    else if (attachmentIndicators.frequentCommunication >= 3) anxiousScore += 15;
+    
+    if (attachmentIndicators.anxietyFromNoContact >= 4) anxiousScore += 30;
+    else if (attachmentIndicators.anxietyFromNoContact >= 3) anxiousScore += 20;
+    
+    if (attachmentIndicators.partnerResponseToUpset === 4) anxiousScore += 20;
 
-    // Type 5: Investigator (Thinker)
-    typeScores[5] = (openness * 0.4) + ((100 - extraversion) * 0.4) + ((100 - agreeableness) * 0.2);
+    // === AVOIDANT ATTACHMENT INDICATORS ===
+    if (attachmentIndicators.personalSpaceNeed >= 4) avoidantScore += 30;
+    else if (attachmentIndicators.personalSpaceNeed >= 3) avoidantScore += 15;
+    
+    if (attachmentIndicators.emotionalVulnerability <= 2) avoidantScore += 30;
+    else if (attachmentIndicators.emotionalVulnerability === 3) avoidantScore += 15;
+    
+    if (attachmentIndicators.handleProblemsAlone >= 4) avoidantScore += 25;
+    else if (attachmentIndicators.handleProblemsAlone >= 3) avoidantScore += 15;
+    
+    if (attachmentIndicators.partnerResponseToUpset === 2) avoidantScore += 15;
 
-    // Type 6: Loyalist (Skeptic)
-    typeScores[6] = (agreeableness * 0.3) + (neuroticism * 0.4) + ((100 - openness) * 0.3);
+    // === SECURE ATTACHMENT INDICATORS ===
+    if (attachmentIndicators.expressNeedsDirectly >= 4) secureScore += 30;
+    else if (attachmentIndicators.expressNeedsDirectly >= 3) secureScore += 20;
+    
+    if (attachmentIndicators.emotionalVulnerability >= 4) secureScore += 30;
+    else if (attachmentIndicators.emotionalVulnerability === 3) secureScore += 15;
+    
+    if (attachmentIndicators.reassuranceNeed === 3) secureScore += 20;
+    
+    if (attachmentIndicators.personalSpaceNeed === 3) secureScore += 20;
 
-    // Type 7: Enthusiast (Epicure)
-    typeScores[7] = (extraversion * 0.4) + (openness * 0.4) + ((100 - neuroticism) * 0.2);
+    // Normalize scores
+    const totalScore = anxiousScore + avoidantScore + secureScore;
+    if (totalScore > 0) {
+      anxiousScore = (anxiousScore / totalScore) * 100;
+      avoidantScore = (avoidantScore / totalScore) * 100;
+      secureScore = (secureScore / totalScore) * 100;
+    }
 
-    // Type 8: Challenger (Leader)
-    typeScores[8] = (extraversion * 0.4) + ((100 - agreeableness) * 0.4) + (conscientiousness * 0.2);
+    return {
+      attachment: this.classifyAttachment(anxiousScore, avoidantScore, secureScore),
+      scores: {
+        secure: Math.round(secureScore),
+        anxious: Math.round(anxiousScore),
+        avoidant: Math.round(avoidantScore)
+      }
+    };
+  }
 
-    // Type 9: Peacemaker (Mediator)
-    typeScores[9] = ((100 - neuroticism) * 0.4) + ((100 - extraversion) * 0.3) + (agreeableness * 0.3);
+  classifyAttachment(anxious, avoidant, secure) {
+    if (secure > 50 && secure > anxious && secure > avoidant) {
+      return 'Secure';
+    }
+    if (anxious > avoidant && anxious > 35) {
+      return 'Anxious-Preoccupied';
+    }
+    if (avoidant > anxious && avoidant > 35) {
+      return 'Dismissive-Avoidant';
+    }
+    if (anxious > 30 && avoidant > 30) {
+      return 'Fearful-Avoidant';
+    }
+    return 'Secure';
+  }
 
-    // Get highest scoring type
-    const enneagramType = Object.keys(typeScores).reduce((a, b) =>
-      typeScores[a] > typeScores[b] ? a : b
-    );
+  // ==================== LOVE LANGUAGE EXTRACTION ====================
+  /**
+   * Extract love language from Q5 answer
+   */
+  getLoveLanguage(answer) {
+    const languages = {
+      1: 'Words of Affirmation',
+      2: 'Acts of Service',
+      3: 'Receiving Gifts',
+      4: 'Quality Time',
+      5: 'Physical Touch'
+    };
+    return languages[answer] || 'Unknown';
+  }
 
-    return parseInt(enneagramType);
+  // ==================== CONFLICT STYLE EXTRACTION ====================
+  /**
+   * Extract conflict resolution style from Q4 answer
+   */
+  getConflictStyle(answer) {
+    const styles = {
+      1: 'Direct Communicator',
+      2: 'Reflective Processor',
+      3: 'Conflict Avoider',
+      4: 'Emotional Processor'
+    };
+    return styles[answer] || 'Unknown';
   }
 
   // ==================== PERSONALITY TYPE MAPPING ====================
-
   getPersonalityType(bigFive) {
     const { openness, conscientiousness, extraversion, agreeableness, neuroticism } = bigFive;
 
     const personalityTypes = {
       'Charismatic Innovator': {
         condition: () => openness > 70 && extraversion > 70 && conscientiousness > 60,
-        description: 'Creative, social, and organized. You inspire others with bold ideas and get things done.'
+        description: 'Creative, social, and organized. You inspire others with bold ideas.'
       },
       'Thoughtful Organizer': {
         condition: () => openness > 60 && conscientiousness > 75 && extraversion < 60,
-        description: 'Organized and creative, you value meaningful connections. You combine innovation with precision.'
+        description: 'Organized and creative. You combine innovation with precision.'
       },
       'The Caring Organizer': {
         condition: () => conscientiousness > 70 && agreeableness > 75 && neuroticism < 50,
-        description: 'Reliable, empathetic, and structured. You naturally support others while maintaining high standards.'
+        description: 'Reliable and empathetic. You naturally support others.'
       },
       'Creative Connector': {
         condition: () => openness > 70 && extraversion > 70 && agreeableness > 65,
-        description: 'Spontaneous and people-oriented, you thrive in dynamic environments with new connections and ideas.'
+        description: 'Spontaneous and people-oriented. You thrive in dynamic environments.'
       },
       'Ambitious Achiever': {
         condition: () => extraversion > 70 && conscientiousness > 70 && agreeableness < 60,
-        description: 'Driven and competitive, you aim high and work hard to succeed. You inspire through action.'
+        description: 'Driven and competitive. You aim high and work hard to succeed.'
       },
       'Steady Support': {
         condition: () => agreeableness > 75 && neuroticism < 40 && extraversion < 50,
-        description: 'Calm and deeply empathetic, you are reliable and supportive. Others trust you completely.'
+        description: 'Calm and deeply empathetic. Others trust you completely.'
       },
       'Creative Empath': {
         condition: () => openness > 70 && agreeableness > 70 && neuroticism > 50,
-        description: 'Imaginative and compassionate, you see possibilities others miss. Highly sensitive to feelings.'
+        description: 'Imaginative and compassionate. Highly sensitive to feelings.'
       },
       'Commanding Executive': {
         condition: () => extraversion > 70 && conscientiousness > 70 && agreeableness < 50,
-        description: 'Direct and results-focused, you naturally lead and get things done. You value efficiency.'
+        description: 'Direct and results-focused. You naturally lead effectively.'
       },
       'Balanced Individual': {
-        condition: () => true, // Default fallback
-        description: 'You display a balanced combination of traits, adapting well to different situations.'
+        condition: () => true,
+        description: 'You display a balanced combination of traits.'
       }
     };
 
-    // Find matching personality type
     for (const [typeName, typeData] of Object.entries(personalityTypes)) {
       if (typeData.condition()) {
-        return {
-          type: typeName,
-          description: typeData.description
-        };
+        return { type: typeName, description: typeData.description };
       }
     }
 
-    return {
-      type: 'Balanced Individual',
-      description: 'You display a balanced combination of traits.'
+    return { type: 'Balanced Individual', description: 'You display a balanced combination of traits.' };
+  }
+
+  // ==================== ENNEAGRAM TYPE CALCULATION ====================
+  calculateEnneagramType(bigFive) {
+    const { openness, conscientiousness, extraversion, agreeableness, neuroticism } = bigFive;
+
+    const typeScores = {
+      1: (conscientiousness * 0.4) + ((100 - neuroticism) * 0.3) + ((100 - agreeableness) * 0.3),
+      2: (agreeableness * 0.5) + ((100 - openness) * 0.3) + (extraversion * 0.2),
+      3: (extraversion * 0.4) + (conscientiousness * 0.3) + ((100 - neuroticism) * 0.3),
+      4: (openness * 0.4) + (neuroticism * 0.3) + ((100 - agreeableness) * 0.3),
+      5: (openness * 0.4) + ((100 - extraversion) * 0.4) + ((100 - agreeableness) * 0.2),
+      6: (agreeableness * 0.3) + (neuroticism * 0.4) + ((100 - openness) * 0.3),
+      7: (extraversion * 0.4) + (openness * 0.4) + ((100 - neuroticism) * 0.2),
+      8: (extraversion * 0.4) + ((100 - agreeableness) * 0.4) + (conscientiousness * 0.2),
+      9: ((100 - neuroticism) * 0.4) + ((100 - extraversion) * 0.3) + (agreeableness * 0.3)
     };
+
+    return Object.keys(typeScores).reduce((a, b) => typeScores[a] > typeScores[b] ? a : b);
   }
 
   // ==================== DETAILED INSIGHTS GENERATION ====================
+  generateInsights(bigFive, enneagramType, attachmentStyle, loveLanguage, conflictStyle) {
+    const { openness, conscientiousness, extraversion, agreeableness, neuroticism } = bigFive;
 
-  generateInsights(bigFive, enneagramType) {
     const insights = {
       strengths: [],
       developmentAreas: [],
       communicationStyle: '',
       stressResponse: '',
       relationshipApproach: '',
+      attachmentStyle: attachmentStyle.attachment,
+      loveLanguage: loveLanguage,
+      conflictStyle: conflictStyle,
       decisionMakingStyle: '',
       workStyle: '',
       careerSuggestions: [],
       compatibility: {
-        compatibleTypes: [],
-        avoidTypes: [],
-        complementaryTraits: []
+        compatibleAttachmentTypes: [],
+        relationshipChallenges: [],
+        relationshipStrengths: []
       }
     };
 
-    const { openness, conscientiousness, extraversion, agreeableness, neuroticism } = bigFive;
-
-    // ===== STRENGTHS =====
+    // STRENGTHS
     if (conscientiousness > 70) insights.strengths.push('Reliability and organization');
     if (agreeableness > 70) insights.strengths.push('Empathy and cooperation');
     if (extraversion > 70) insights.strengths.push('Leadership and social influence');
     if (openness > 70) insights.strengths.push('Creativity and innovation');
     if (neuroticism < 40) insights.strengths.push('Emotional stability and resilience');
-    if (conscientiousness > 75 && agreeableness > 75) insights.strengths.push('Balanced judgment');
 
-    // ===== DEVELOPMENT AREAS =====
+    // DEVELOPMENT AREAS
     if (conscientiousness < 40) insights.developmentAreas.push('Organization and planning');
     if (agreeableness < 40) insights.developmentAreas.push('Collaboration and empathy');
-    if (extraversion < 40) insights.developmentAreas.push('Social confidence and networking');
+    if (extraversion < 40) insights.developmentAreas.push('Social confidence');
     if (openness < 40) insights.developmentAreas.push('Adaptability to change');
     if (neuroticism > 60) insights.developmentAreas.push('Stress management');
 
-    // ===== COMMUNICATION STYLE =====
+    // COMMUNICATION STYLE
     if (extraversion > 65 && agreeableness > 65) {
-      insights.communicationStyle = 'Warm, engaging, and collaborative. You naturally draw people in with your enthusiasm.';
+      insights.communicationStyle = 'Warm, engaging, and collaborative.';
     } else if (extraversion > 65 && agreeableness < 50) {
-      insights.communicationStyle = 'Direct, confident, and commanding. You speak with authority and clarity.';
+      insights.communicationStyle = 'Direct, confident, and commanding.';
     } else if (extraversion < 50 && agreeableness > 65) {
-      insights.communicationStyle = 'Thoughtful and considerate. You listen more than you speak but your words carry weight.';
+      insights.communicationStyle = 'Thoughtful and considerate.';
     } else {
-      insights.communicationStyle = 'Balanced and situational. You adapt your communication style to different contexts.';
+      insights.communicationStyle = 'Balanced and situational.';
     }
 
-    // ===== STRESS RESPONSE =====
+    // STRESS RESPONSE
     if (neuroticism > 60) {
-      insights.stressResponse = 'You feel stress deeply and need time to process. Seek support from trusted people.';
+      insights.stressResponse = 'You feel stress deeply. Seek support from trusted people.';
     } else if (neuroticism > 40 && neuroticism < 60) {
-      insights.stressResponse = 'You handle stress reasonably well, taking time to think through problems.';
+      insights.stressResponse = 'You handle stress reasonably well, taking time to think things through.';
     } else {
-      insights.stressResponse = 'You remain calm under pressure. You process challenges logically and move forward.';
+      insights.stressResponse = 'You remain calm under pressure and process challenges logically.';
     }
 
-    // ===== RELATIONSHIP APPROACH =====
-    if (agreeableness > 70) {
-      insights.relationshipApproach = 'You prioritize harmony and deep connection. You are naturally supportive and loyal.';
-    } else if (extraversion > 70) {
-      insights.relationshipApproach = 'You bring energy and excitement to relationships. You enjoy social bonding.';
-    } else {
-      insights.relationshipApproach = 'You value depth over breadth. You build strong, meaningful relationships.';
+    // RELATIONSHIP APPROACH (attachment-based)
+    if (attachmentStyle.attachment === 'Secure') {
+      insights.relationshipApproach = 'You feel comfortable with both closeness and independence.';
+      insights.compatibility.relationshipStrengths.push('Healthy balance of intimacy and autonomy');
+      insights.compatibility.compatibleAttachmentTypes.push('Secure', 'Anxious', 'Avoidant');
+    } else if (attachmentStyle.attachment === 'Anxious-Preoccupied') {
+      insights.relationshipApproach = 'You desire closeness and reassurance. You are emotionally expressive.';
+      insights.compatibility.relationshipChallenges.push('May need reassurance during partner\'s independent time');
+      insights.compatibility.compatibleAttachmentTypes.push('Secure', 'Anxious');
+    } else if (attachmentStyle.attachment === 'Dismissive-Avoidant') {
+      insights.relationshipApproach = 'You value independence and emotional distance. You are dependable.';
+      insights.compatibility.relationshipChallenges.push('May create distance when partner seeks intimacy');
+      insights.compatibility.compatibleAttachmentTypes.push('Secure', 'Avoidant');
+    } else if (attachmentStyle.attachment === 'Fearful-Avoidant') {
+      insights.relationshipApproach = 'You have mixed feelings about intimacy. Building trust is important.';
+      insights.compatibility.relationshipChallenges.push('May alternate between seeking and avoiding closeness');
+      insights.compatibility.compatibleAttachmentTypes.push('Secure');
     }
 
-    // ===== DECISION MAKING STYLE =====
-    if (conscientiousness > 70) {
-      insights.decisionMakingStyle = 'You are thorough and analytical. You gather information before deciding.';
-    } else if (openness > 70) {
-      insights.decisionMakingStyle = 'You are creative and flexible. You consider unconventional options.';
-    } else {
-      insights.decisionMakingStyle = 'You use a balanced approach, combining logic with intuition.';
-    }
-
-    // ===== WORK STYLE =====
-    if (conscientiousness > 70 && agreeableness > 70) {
-      insights.workStyle = 'Team player who is organized and detail-oriented. You create stable, productive environments.';
-    } else if (conscientiousness > 70 && extraversion > 65) {
-      insights.workStyle = 'Natural leader who is well-organized. You inspire and direct teams effectively.';
-    } else if (openness > 70) {
-      insights.workStyle = 'Creative contributor who brings innovation. You thrive in dynamic environments.';
-    } else {
-      insights.workStyle = 'Reliable professional with steady output. You maintain quality consistently.';
-    }
-
-    // ===== CAREER SUGGESTIONS =====
-    const careerMatrix = this.getCareerSuggestions(bigFive);
-    insights.careerSuggestions = careerMatrix;
-
-    // ===== COMPATIBILITY =====
-    insights.compatibility = this.getCompatibilityInfo(bigFive, enneagramType);
+    // CAREER SUGGESTIONS
+    insights.careerSuggestions = this.getCareerSuggestions(bigFive);
 
     return insights;
   }
 
   getCareerSuggestions(bigFive) {
-    const { openness, conscientiousness, extraversion, agreeableness, neuroticism } = bigFive;
+    const { openness, conscientiousness, extraversion, agreeableness } = bigFive;
     const careers = [];
 
-    // High conscientiousness + High agreeableness
     if (conscientiousness > 65 && agreeableness > 65) {
-      careers.push('Teacher', 'Project Manager', 'Healthcare Professional', 'Social Worker');
+      careers.push('Teacher', 'Project Manager', 'Healthcare Professional', 'Counselor');
     }
-
-    // High openness + High creativity
     if (openness > 70) {
-      careers.push('Designer', 'Architect', 'Researcher', 'Artist', 'Entrepreneur');
+      careers.push('Designer', 'Architect', 'Researcher', 'Scientist');
     }
-
-    // High extraversion + High conscientiousness
     if (extraversion > 65 && conscientiousness > 65) {
-      careers.push('Executive', 'Sales Manager', 'Event Planner', 'Consultant');
+      careers.push('Executive', 'Sales Manager', 'Team Lead');
     }
 
-    // High extraversion
-    if (extraversion > 70 && conscientiousness < 60) {
-      careers.push('Sales Representative', 'Marketing Manager', 'Public Relations Specialist');
-    }
-
-    // High openness + Low conscientiousness
-    if (openness > 70 && conscientiousness < 50) {
-      careers.push('Freelancer', 'Startup Founder', 'Creative Writer', 'Musician');
-    }
-
-    // Stable and organized
-    if (conscientiousness > 75 && neuroticism < 40) {
-      careers.push('Accountant', 'Engineer', 'Administrator', 'Analyst');
-    }
-
-    return careers.length > 0 ? careers : ['Diverse career paths are open to you'];
-  }
-
-  getCompatibilityInfo(bigFive, enneagramType) {
-    const { openness, conscientiousness, extraversion, agreeableness, neuroticism } = bigFive;
-
-    const compatibility = {
-      compatibleTypes: [],
-      avoidTypes: [],
-      complementaryTraits: []
-    };
-
-    // Compatible types (similar personalities)
-    if (conscientiousness > 70 && agreeableness > 70) {
-      compatibility.compatibleTypes.push('Other organized, empathetic individuals');
-      compatibility.complementaryTraits.push('Someone with spontaneity to balance planning');
-    }
-
-    if (extraversion > 70) {
-      compatibility.compatibleTypes.push('Other social, outgoing people');
-      compatibility.complementaryTraits.push('Someone introverted but supportive');
-    }
-
-    if (openness > 70) {
-      compatibility.compatibleTypes.push('Curious, creative individuals');
-      compatibility.complementaryTraits.push('Someone grounded to balance exploration');
-    }
-
-    // Avoid types (opposite personalities)
-    if (conscientiousness < 50) {
-      compatibility.avoidTypes.push('Overly rigid, controlling individuals');
-    }
-
-    if (extraversion < 50) {
-      compatibility.avoidTypes.push('Those who demand constant social engagement');
-    }
-
-    if (agreeableness < 50) {
-      compatibility.avoidTypes.push('Very conflict-avoidant or passive people');
-    }
-
-    return compatibility;
+    return careers.length > 0 ? careers : ['Diverse career paths'];
   }
 }
 

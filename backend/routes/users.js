@@ -1,12 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { protect } = require('../middleware/auth'); // Correct middleware
+const { protect } = require('../middleware/auth');
 
-// 🛠 Use 'protect' not 'requireAuth'
+// ✅ Fetch all users from same domain
 router.get('/all', protect, async (req, res) => {
   try {
-    const users = await User.find(); // ✅ fetch all users including current
+    const currentUser = await User.findById(req.user._id);
+    
+    if (!currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // ✅ Filter by same email domain
+    const users = await User.find({
+      _id: { $ne: req.user._id },
+      emailDomain: currentUser.emailDomain
+    }).select("-password");
+    
     res.json(users);
   } catch (err) {
     console.error(err);
@@ -15,13 +26,3 @@ router.get('/all', protect, async (req, res) => {
 });
 
 module.exports = router;
-
-//  {/* Profile picture */}
-//               <img
-//                 src={`http://localhost:5000/uploads/${match.profilePic}`}
-//                 alt="Profile"
-//                 onError={(e) => {
-//                   e.target.src = '/default-avatar.png';
-//                 }}
-//                 className="w-full h-56 object-cover rounded-t-lg"
-//               />

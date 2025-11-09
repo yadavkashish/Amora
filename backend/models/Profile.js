@@ -1,35 +1,40 @@
-// models/Profile.js
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const profileSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
     // Basic details
     name: { type: String, required: true, trim: true },
     age: { type: Number, min: 16, required: true },
-    gender: { type: String, enum: ['Male', 'Female', 'Other'], required: true },
+    gender: { type: String, enum: ["Male", "Female", "Other"], required: true },
     bio: { type: String, maxlength: 500 },
 
     // College-specific
-    branch: { type: String, required: true },   // e.g., CS, IT, ECE
-    course: { type: String, required: true },   // e.g., B.Tech, MBA
+    branch: { type: String, required: true },
+    course: { type: String, required: true },
     year: { type: Number, enum: [1, 2, 3, 4], required: true },
 
     // Preferences
-    preference: { type: String, enum: ['Male', 'Female', 'Other', 'Any'], default: 'Any' },
+    preference: { type: String, enum: ["Male", "Female", "Other", "Any"], default: "Any" },
     interests: [{ type: String }],
 
-    // Location (optional, since within campus)
+    // Location
     location: { type: String },
 
-    // Media (now stored as cloud URLs + public ids)
-    profilePic: { type: String, default: '' }, // secure URL from Cloudinary
-    profilePicPublicId: { type: String, default: '' }, // cloudinary public_id for deletion
-    morePics: [{ type: String }], // array of secure URLs
-    morePicsPublicIds: [{ type: String }], // array of matching public_ids
+    // Profile Picture
+    profilePic: { type: String, default: "" },
+    profilePicPublicId: { type: String, default: "" },
+
+    // More Pictures (Gallery)
+    morePics: [{ type: String }],
+    morePicsPublicIds: [{ type: String }],
+
+    // Cover Image (NEW)
+    coverImage: { type: String, default: "" },
+    coverImagePublicId: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Profile', profileSchema);
+module.exports = mongoose.model("Profile", profileSchema);

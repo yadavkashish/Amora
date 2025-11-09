@@ -23,7 +23,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      'http://localhost:5173',         // Local dev
+      'http://localhost:5174',         // Local dev
       'https://amorateams.netlify.app',
       'https://www.amoraonline.in'
     ],

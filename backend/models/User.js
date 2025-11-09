@@ -4,17 +4,42 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true }
-});
+  password: { type: String, required: true },
+  
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'Other'],
+    default: null,
+  },
+  
+  // ✅ NEW FIELD: Extracted email domain for filtering
+  emailDomain: {
+    type: String,
+    required: true,
+  },
+}, { timestamps: true });
 
-// ✅ Hash password before saving
+// ✅ Extract domain before saving
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
+  try {
+    // Extract domain from email if email is modified or new
+    if (this.isModified('email') || this.isNew) {
+      const domain = this.email.substring(this.email.lastIndexOf('@'));
+      this.emailDomain = domain.toLowerCase(); // e.g., "@gmail.com" or "@kiet.edu"
+    }
+
+    // Hash password if modified
+    if (this.isModified('password')) {
+      this.password = await bcrypt.hash(this.password, 10);
+    }
+    
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
-// ✅ Compare password
+// Compare password helper
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };

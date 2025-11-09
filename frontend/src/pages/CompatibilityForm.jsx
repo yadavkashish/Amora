@@ -4,6 +4,18 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { personalityQuestions } from "../data/personalityQuestions";
 
+/**
+ * CompatibilityForm
+ *
+ * Key behavior:
+ * - Creates `renderedQuestions` from `personalityQuestions` but replaces
+ *   multiple dealbreaker_toggle entries with a single grouped step called
+ *   `dealbreaker_group`.
+ * - The grouped step uses the original dealbreaker questions (to render checkboxes)
+ *   but the UI presents them in a single screen.
+ * - Backend payload remains unchanged: `dealbreakers` object is still submitted as before.
+ */
+
 export default function CompatibilityForm() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -13,33 +25,102 @@ export default function CompatibilityForm() {
   const [direction, setDirection] = useState(0);
   const [sectionStartTime, setSectionStartTime] = useState(Date.now());
   const [timeSpent, setTimeSpent] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
   const navigate = useNavigate();
 
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // Organize questions by section
-  const questionsBySection = {};
-  personalityQuestions.forEach((q) => {
-    if (!questionsBySection[q.section]) {
-      questionsBySection[q.section] = [];
-    }
-    questionsBySection[q.section].push(q);
-  });
-
-  const sections = Object.keys(questionsBySection)
-    .map(Number)
-    .sort((a, b) => a - b);
-  const currentSection = personalityQuestions[currentIndex]?.section;
-  const sectionQuestions = questionsBySection[currentSection] || [];
-  const indexInSection = sectionQuestions.findIndex(
-    (q) => q.id === personalityQuestions[currentIndex]?.id
+  // --- Build renderedQuestions: remove all individual dealbreaker entries and
+  // replace with a single synthetic grouped dealbreaker question.
+  const originalDealbreakers = personalityQuestions.filter(
+    (q) => q.type === "dealbreaker_toggle"
   );
 
-  const currentQuestion = personalityQuestions[currentIndex];
-  const totalQuestions = personalityQuestions.length;
+  // Questions without dealbreakers
+  const nonDealbreakerQuestions = personalityQuestions.filter(
+    (q) => q.type !== "dealbreaker_toggle"
+  );
+
+  // Synthetic grouped step (append at the end). You can change `section` if needed.
+  const dealbreakerGroup = {
+    id: "dealbreaker_group",
+    name: "dealbreaker_group",
+    type: "dealbreaker_toggle",
+    question: "Dealbreakers (grouped)",
+    // optional: pick a section — if you prefer it to appear in another place,
+    // change insertion logic below.
+    section: originalDealbreakers.length ? originalDealbreakers[0].section : 7,
+  };
+
+  // The actual array the UI will step through
+  const renderedQuestions = [...nonDealbreakerQuestions, dealbreakerGroup];
+
+  // Expose some derived values from renderedQuestions (used by UI)
+  const totalQuestions = renderedQuestions.length;
+  const currentQuestion = renderedQuestions[currentIndex];
+  const currentSection = currentQuestion?.section;
+  const questionsBySection = {};
+  renderedQuestions.forEach((q) => {
+    if (!questionsBySection[q.section]) questionsBySection[q.section] = [];
+    questionsBySection[q.section].push(q);
+  });
+  const sectionQuestions = questionsBySection[currentSection] || [];
+  const indexInSection = sectionQuestions.findIndex(
+    (q) => q.id === currentQuestion?.id
+  );
+
+  // Progress (based on renderedQuestions)
   const progress = ((currentIndex + 1) / totalQuestions) * 100;
 
-  // Keyboard navigation
+  // --- Status check on mount (existing logic)
+  useEffect(() => {
+    let mounted = true;
+    const checkStatus = async () => {
+      setStatusLoading(true);
+      try {
+        const config = { withCredentials: true };
+        const res = await axios.get(
+          `${API_URL}/api/compatibility/status`,
+          config
+        );
+        if (!mounted) return;
+        if (res?.data?.submitted) {
+          setSubmitted(true);
+          setMessage(
+            "✅ You have already completed the compatibility form. Thanks!"
+          );
+        } else {
+          setSubmitted(false);
+          setMessage("");
+        }
+      } catch (err) {
+        console.warn(
+          "Compatibility status check failed, falling back to localStorage",
+          err
+        );
+        const localFlag = localStorage.getItem("compatibilityFormSubmitted");
+        if (localFlag === "true") {
+          setSubmitted(true);
+          setMessage(
+            "✅ You have already completed the compatibility form (local)."
+          );
+        } else {
+          setSubmitted(false);
+          setMessage("");
+        }
+      } finally {
+        if (mounted) setStatusLoading(false);
+      }
+    };
+
+    checkStatus();
+    return () => {
+      mounted = false;
+    };
+  }, [API_URL]);
+
+  // Keyboard navigation (works on renderedQuestions)
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.key === "ArrowRight" && isAnswered && !isLastQuestion) {
@@ -51,7 +132,7 @@ export default function CompatibilityForm() {
         e.key <= "5" &&
         currentQuestion?.type === "text"
       ) {
-        const optionIndex = parseInt(e.key) - 1;
+        const optionIndex = parseInt(e.key, 10) - 1;
         if (optionIndex < currentQuestion.options.length) {
           handleAnswerChange(currentQuestion.id, optionIndex + 1);
         }
@@ -60,9 +141,9 @@ export default function CompatibilityForm() {
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [currentIndex, answers, currentQuestion]);
+  }, [currentIndex, answers, currentQuestion]); // eslint-disable-line
 
-  // Track time per section
+  // Track time per section on unmount of section
   useEffect(() => {
     return () => {
       const sectionTime = Date.now() - sectionStartTime;
@@ -74,35 +155,29 @@ export default function CompatibilityForm() {
   }, [currentSection, sectionStartTime]);
 
   const handleAnswerChange = (qId, value) => {
-    setAnswers({ ...answers, [qId]: parseInt(value) });
+    setAnswers((prev) => ({ ...prev, [qId]: parseInt(value, 10) }));
 
-    // Auto-advance for non-dealbreaker questions
+    // Auto-advance for non dealbreaker group (we auto-advance for any non dealbreaker_toggle)
     if (currentQuestion?.type !== "dealbreaker_toggle") {
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-
+      if (navigator.vibrate) navigator.vibrate(50);
       setTimeout(() => {
         if (currentIndex < totalQuestions - 1) {
           setDirection(1);
-          setCurrentIndex(currentIndex + 1);
+          setCurrentIndex((i) => i + 1);
           setSectionStartTime(Date.now());
         }
-      }, 300);
+      }, 250);
     }
   };
 
   const handleDealbreakerChange = (name) => {
-    setDealbreakers({
-      ...dealbreakers,
-      [name]: !dealbreakers[name],
-    });
+    setDealbreakers((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
   const handleNext = () => {
     if (currentIndex < totalQuestions - 1) {
       setDirection(1);
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex((i) => i + 1);
       setSectionStartTime(Date.now());
     }
   };
@@ -110,17 +185,17 @@ export default function CompatibilityForm() {
   const handlePrevious = () => {
     if (currentIndex > 0) {
       setDirection(-1);
-      setCurrentIndex(currentIndex - 1);
+      setCurrentIndex((i) => i - 1);
       setSectionStartTime(Date.now());
     }
   };
 
   const handleSubmit = async () => {
-    // Only require text and bubble questions (not dealbreakers or toggles)
+    // Required questions still derive from original data model (text+bubble),
+    // because those are what we expect answers for.
     const requiredQuestions = personalityQuestions.filter(
       (q) => q.type === "text" || q.type === "bubble"
     );
-
     const unanswered = requiredQuestions.filter((q) => !answers[q.id]);
 
     if (unanswered.length > 0) {
@@ -130,7 +205,7 @@ export default function CompatibilityForm() {
       const firstUnanswered = personalityQuestions.findIndex(
         (q) => (q.type === "text" || q.type === "bubble") && !answers[q.id]
       );
-      setCurrentIndex(firstUnanswered);
+      if (firstUnanswered >= 0) setCurrentIndex(firstUnanswered);
       return;
     }
 
@@ -140,40 +215,38 @@ export default function CompatibilityForm() {
     try {
       const payload = {
         answers,
-        dealbreakers,
+        dealbreakers, // unchanged shape — backend unaffected
         timeSpent,
         totalTimeSpent: Date.now() - sectionStartTime,
         completedAt: new Date().toISOString(),
       };
 
-      // ✅ Make sure withCredentials is set
       const config = {
         withCredentials: true,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       };
 
+      await axios.post(`${API_URL}/api/compatibility/submit`, payload, config);
+      await axios.post(
+        `${API_URL}/api/personality/submit`,
+        { answers },
+        config
+      );
 
-    // Save the answers for compatibility and personality
-    await axios.post(`${API_URL}/api/compatibility/submit`, payload, config);
-    await axios.post(`${API_URL}/api/personality/submit`, { answers }, config);
+      setMessage(
+        "✅ Your answers have been saved. Generating your personality report..."
+      );
+      await axios.post(
+        `${API_URL}/api/personality/generate-report`,
+        {},
+        config
+      );
+      setMessage("✅ Report generated! Redirecting...");
 
-     setMessage("✅ Your answers have been saved. Generating your personality report...");
+      localStorage.setItem("compatibilityFormSubmitted", "true");
+      setSubmitted(true);
 
-      // Now trigger the AI generation for the user's personality
-    await axios.post(`${API_URL}/api/personality/generate-report`, {}, config);
-
-    setMessage("✅ Report generated! Redirecting...");
-
-
-
-
-      
-
-      setTimeout(() => {
-        navigate("/profileform");
-      }, 1500);
+      setTimeout(() => navigate("/profileform"), 1200);
     } catch (err) {
       console.error("❌ Error details:", err.response?.data || err);
       setMessage("❌ Error saving answers. Please try again.");
@@ -190,21 +263,10 @@ export default function CompatibilityForm() {
 
   const questionVariants = {
     enter: { opacity: 0, y: 20, scale: 0.98 },
-    center: {
-      zIndex: 1,
-      opacity: 1,
-      y: 0,
-      scale: 1,
-    },
-    exit: {
-      zIndex: 0,
-      opacity: 0,
-      y: -20,
-      scale: 0.98,
-    },
+    center: { zIndex: 1, opacity: 1, y: 0, scale: 1 },
+    exit: { zIndex: 0, opacity: 0, y: -20, scale: 0.98 },
   };
 
-  // Get section emoji and title
   const getSectionInfo = (section) => {
     const sectionNames = {
       1: { emoji: "⚡", title: "Welcome & Ready?" },
@@ -220,7 +282,6 @@ export default function CompatibilityForm() {
 
   const sectionInfo = getSectionInfo(currentSection);
 
-  // Get format badge info
   const getFormatBadge = (type) => {
     const badges = {
       text: {
@@ -254,6 +315,57 @@ export default function CompatibilityForm() {
 
   const formatBadge = getFormatBadge(currentQuestion?.type);
 
+  // --- Loading / submitted states UI (unchanged)
+  if (statusLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800">Loading...</h2>
+          <p className="text-sm text-gray-600 mt-2">
+            Checking your submission status…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl p-6 md:p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">
+            ✅ You’ve already completed the compatibility form
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Thanks — your responses are saved. If you want to update them,
+            contact support or use the profile page (if retake is allowed).
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => navigate("/profileform")}
+              className="px-5 py-2 rounded-xl font-semibold bg-gradient-to-r from-pink-500 to-purple-600 text-white hover:shadow-lg"
+            >
+              View Profile / Report
+            </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem("compatibilityFormSubmitted");
+                setSubmitted(false);
+                setMessage("");
+              }}
+              className="px-5 py-2 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200"
+            >
+              Retake (clear local flag)
+            </button>
+          </div>
+          {message && (
+            <div className="mt-4 text-sm text-gray-500">{message}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
@@ -264,355 +376,362 @@ export default function CompatibilityForm() {
     );
   }
 
+  // --- Main UI: works against renderedQuestions (so count reflects grouped dealbreaker)
   return (
-    <div className="min-h-screen pt-23 bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen pt-16 bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
-        {/* Header with Progress */}
+        {/* Progress placed slightly higher */}
         <motion.div
-          className="mb-8"
-          initial={{ opacity: 0, y: -20 }}
+          className="mb-4"
+          initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.4 }}
         >
-          {/* Section Info */}
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+          <div className="flex items-center justify-between text-xs md:text-sm text-gray-600 mb-1">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">{sectionInfo.emoji}</span>
-              <span className="font-semibold text-gray-700">
+              <span className="text-xl md:text-2xl">{sectionInfo.emoji}</span>
+              <span className="font-semibold text-gray-700 text-sm md:text-base">
                 {sectionInfo.title}
               </span>
             </div>
-            <span className="font-semibold text-pink-600">
+            <span className="font-semibold text-pink-600 text-sm">
               {currentIndex + 1} of {totalQuestions}
             </span>
           </div>
 
-          {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+          {/* Progress Bar moved up */}
+          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden shadow-inner">
             <motion.div
-              className="bg-gradient-to-r from-pink-500 to-purple-600 h-3 rounded-full"
+              className="bg-gradient-to-r from-pink-500 to-purple-600 h-2 rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
             />
-          </div>
-
-          {/* Section Progress */}
-          <div className="text-xs text-gray-500 mt-2 text-center">
-            Question {indexInSection + 1} of {sectionQuestions.length} in this
-            section
           </div>
         </motion.div>
 
         {/* Main Card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 min-h-[500px] flex flex-col justify-between">
-          <div className="relative overflow-hidden flex-1 min-h-[320px]">
-            <AnimatePresence initial={false} custom={direction} mode="wait">
-              <motion.div
-                key={currentIndex}
-                custom={direction}
-                variants={questionVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{
-                  y: { type: "spring", stiffness: 300, damping: 30 },
-                  opacity: { duration: 0.3, ease: "easeInOut" },
-                  scale: { duration: 0.3, ease: "easeInOut" },
-                }}
-                className="h-full flex flex-col"
-              >
-                {/* Format Badge */}
-                <div className="mb-6">
-                  <span
-                    className={`inline-block ${formatBadge.bg} ${formatBadge.text} text-xs font-semibold px-3 py-1 rounded-full`}
-                  >
-                    {formatBadge.label}
-                  </span>
-                </div>
-
-                {/* Question Text */}
-                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-8 leading-tight">
-                  {currentQuestion.question}
-                </h2>
-
-                {/* Options Container */}
-                <div className="space-y-3 flex-1">
-                  {/* TEXT OPTIONS */}
-                  {currentQuestion.type === "text" && (
-                    <div className="space-y-3">
-                      {currentQuestion.options.map((opt, i) => {
-                        const isSelected =
-                          answers[currentQuestion.id] === i + 1;
-                        return (
-                          <motion.button
-                            key={i}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 * i + 0.2 }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() =>
-                              handleAnswerChange(currentQuestion.id, i + 1)
-                            }
-                            className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-                              isSelected
-                                ? "border-pink-500 bg-pink-50 shadow-md"
-                                : "border-gray-200 bg-white hover:border-pink-300 hover:shadow-sm"
-                            }`}
-                          >
-                            <div className="flex items-center">
-                              <div
-                                className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-all ${
-                                  isSelected
-                                    ? "border-pink-500 bg-pink-500"
-                                    : "border-gray-300"
-                                }`}
-                              >
-                                {isSelected && (
-                                  <motion.svg
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    className="w-4 h-4 text-white"
-                                    fill="none"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="3"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path d="M5 13l4 4L19 7"></path>
-                                  </motion.svg>
-                                )}
-                              </div>
-                              <span
-                                className={`text-base md:text-lg ${
-                                  isSelected
-                                    ? "text-pink-700 font-semibold"
-                                    : "text-gray-700"
-                                }`}
-                              >
-                                <span className="text-pink-400 font-bold mr-2">
-                                  {i + 1}.
-                                </span>
-                                {opt}
-                              </span>
-                            </div>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* BUBBLE SCALE */}
-                  {currentQuestion.type === "bubble" && (
-                    <motion.div
-                      className="pt-4 flex-1 flex flex-col justify-center"
-                      initial="hidden"
-                      animate="visible"
-                      variants={{
-                        visible: {
-                          transition: {
-                            staggerChildren: 0.08,
-                          },
-                        },
-                      }}
+        <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 min-h-[360px] md:min-h-[420px] max-h-[88vh] overflow-hidden flex flex-col justify-between">
+          <div className="relative overflow-hidden flex-1 min-h-[220px] md:min-h-[320px]">
+            <div className="h-full w-full overflow-auto md:overflow-hidden p-0 md:p-2">
+              <AnimatePresence initial={false} custom={direction} mode="wait">
+                <motion.div
+                  key={currentIndex}
+                  custom={direction}
+                  variants={questionVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    y: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.25, ease: "easeInOut" },
+                    scale: { duration: 0.25, ease: "easeInOut" },
+                  }}
+                  className="h-full flex flex-col"
+                >
+                  <div className="mb-3">
+                    <span
+                      className={`inline-block ${formatBadge.bg} ${formatBadge.text} text-xs font-semibold px-2 py-1 rounded-full`}
                     >
-                      <div className="flex flex-wrap gap-2 md:gap-3 justify-center items-center mb-6">
-                        {[
-                          "Strongly Agree",
-                          "Agree",
-                          "Neutral",
-                          "Disagree",
-                          "Strongly Disagree",
-                        ].map((opt, i) => {
+                      {formatBadge.label}
+                    </span>
+                  </div>
+
+                  <h2 className="text-lg md:text-2xl font-bold text-gray-800 mb-4 leading-tight">
+                    {currentQuestion.question}
+                  </h2>
+
+                  <div className="space-y-3 flex-1">
+                    {/* TEXT OPTIONS */}
+                    {currentQuestion.type === "text" && (
+                      <div className="space-y-2">
+                        {currentQuestion.options.map((opt, i) => {
                           const isSelected =
                             answers[currentQuestion.id] === i + 1;
-                          const colorSchemes = [
-                            "bg-green-500 hover:bg-green-600 border-green-500",
-                            "bg-green-400 hover:bg-green-500 border-green-400",
-                            "bg-gray-400 hover:bg-gray-500 border-gray-400",
-                            "bg-orange-400 hover:bg-orange-500 border-orange-400",
-                            "bg-red-500 hover:bg-red-600 border-red-500",
-                          ];
-                          const bubbleSizes = [
-                            "w-20 h-20 md:w-24 md:h-24",
-                            "w-16 h-16 md:w-20 md:h-20",
-                            "w-14 h-14 md:w-16 md:h-16",
-                            "w-16 h-16 md:w-20 md:h-20",
-                            "w-20 h-20 md:w-24 md:h-24",
-                          ];
-                          const bubbleLabels = ["SA", "A", "N", "D", "SD"];
-
-                          const bubbleVariants = {
-                            hidden: { opacity: 0, scale: 0.5 },
-                            visible: {
-                              opacity: 1,
-                              scale: 1,
-                              transition: {
-                                type: "spring",
-                                stiffness: 300,
-                                damping: 20,
-                              },
-                            },
-                          };
-
                           return (
                             <motion.button
-                              type="button"
                               key={i}
-                              variants={bubbleVariants}
-                              whileHover={{
-                                scale: 1.1,
-                                y: -5,
-                                transition: { type: "spring", stiffness: 300 },
-                              }}
-                              whileTap={{ scale: 0.95 }}
+                              initial={{ opacity: 0, x: -12 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.06 * i + 0.08 }}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
                               onClick={() =>
                                 handleAnswerChange(currentQuestion.id, i + 1)
                               }
-                              className={`flex items-center justify-center rounded-full border-4 transition-all duration-200 focus:outline-none font-bold text-white ${
-                                bubbleSizes[i]
-                              } ${colorSchemes[i]} ${
+                              className={`w-full text-left p-3 rounded-lg border-2 transition-all duration-200 ${
                                 isSelected
-                                  ? "ring-4 ring-offset-2 ring-pink-400 scale-110 shadow-xl"
-                                  : "opacity-70 hover:opacity-100 shadow-lg"
+                                  ? "border-pink-500 bg-pink-50 shadow-sm"
+                                  : "border-gray-200 bg-white hover:border-pink-300"
                               }`}
-                              title={opt}
                             >
-                              {bubbleLabels[i]}
+                              <div className="flex items-center">
+                                <div
+                                  className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "border-pink-500 bg-pink-500"
+                                      : "border-gray-300"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <svg
+                                      className="w-3 h-3 text-white"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="3"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                  )}
+                                </div>
+                                <span
+                                  className={`text-sm md:text-base ${
+                                    isSelected
+                                      ? "text-pink-700 font-semibold"
+                                      : "text-gray-700"
+                                  }`}
+                                >
+                                  <span className="text-pink-400 font-bold mr-2 text-sm">
+                                    {i + 1}.
+                                  </span>
+                                  {opt}
+                                </span>
+                              </div>
                             </motion.button>
                           );
                         })}
                       </div>
-                      <div className="flex justify-between text-xs md:text-sm text-gray-600 px-2">
-                        <span className="text-center">
-                          Strongly
-                          <br />
-                          Agree
-                        </span>
-                        <span className="text-center">
-                          Strongly
-                          <br />
-                          Disagree
-                        </span>
-                      </div>
-                    </motion.div>
-                  )}
+                    )}
 
-                  {/* QUICK POLL */}
-                  {currentQuestion.type === "quick_poll" && (
-                    <div className="space-y-3 pt-4">
-                      {currentQuestion.options.map((opt, i) => {
-                        const isSelected =
-                          answers[currentQuestion.id] === i + 1;
-                        return (
-                          <motion.button
-                            key={i}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.1 * i + 0.2 }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() =>
-                              handleAnswerChange(currentQuestion.id, i + 1)
-                            }
-                            className={`w-full p-5 rounded-xl border-2 transition-all duration-200 text-base md:text-lg font-semibold ${
-                              isSelected
-                                ? "border-indigo-500 bg-indigo-50 shadow-md text-indigo-700"
-                                : "border-gray-200 bg-white hover:border-indigo-300 hover:shadow-sm text-gray-700"
-                            }`}
-                          >
-                            {opt}
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  )}
+                    {/* BUBBLE SCALE with filled color + ring */}
+                    {currentQuestion.type === "bubble" && (
+                      <motion.div
+                        className="pt-2 flex-1 flex flex-col justify-center"
+                        initial="hidden"
+                        animate="visible"
+                        variants={{
+                          visible: { transition: { staggerChildren: 0.06 } },
+                        }}
+                      >
+                        <div className="flex flex-wrap gap-2 md:gap-3 justify-center items-center mb-4">
+                          {[
+                            "Strongly Agree",
+                            "Agree",
+                            "Neutral",
+                            "Disagree",
+                            "Strongly Disagree",
+                          ].map((opt, i) => {
+                            const isSelected =
+                              answers[currentQuestion.id] === i + 1;
+                            const colorSchemes = [
+                              "bg-green-500 hover:bg-green-600 border-green-500",
+                              "bg-green-400 hover:bg-green-500 border-green-400",
+                              "bg-gray-400 hover:bg-gray-500 border-gray-400",
+                              "bg-orange-400 hover:bg-orange-500 border-orange-400",
+                              "bg-red-500 hover:bg-red-600 border-red-500",
+                            ];
+                            const bubbleSizes = [
+                              "w-16 h-16 md:w-20 md:h-20",
+                              "w-14 h-14 md:w-18 md:h-18",
+                              "w-12 h-12 md:w-16 md:h-16",
+                              "w-14 h-14 md:w-18 md:h-18",
+                              "w-16 h-16 md:w-20 md:h-20",
+                            ];
+                            const bubbleLabels = ["SA", "A", "N", "D", "SD"];
 
-                  {/* EMOJI SCALE */}
-                  {currentQuestion.type === "emoji_scale" && (
-                    <div className="flex flex-col gap-6 pt-4">
-                      {currentQuestion.options.map((option, i) => {
-                        const isSelected =
-                          answers[currentQuestion.id] === option.value;
-                        return (
-                          <motion.button
-                            key={i}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 * i + 0.2 }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() =>
-                              handleAnswerChange(
-                                currentQuestion.id,
-                                option.value
-                              )
-                            }
-                            className={`w-full p-5 rounded-xl border-2 transition-all duration-200 flex items-center gap-4 ${
-                              isSelected
-                                ? "border-yellow-500 bg-yellow-50 shadow-md"
-                                : "border-gray-200 bg-white hover:border-yellow-300 hover:shadow-sm"
-                            }`}
-                          >
-                            <span className="text-4xl">{option.emoji}</span>
-                            <span
-                              className={`text-lg font-semibold ${
-                                isSelected ? "text-yellow-700" : "text-gray-700"
+                            const bubbleVariants = {
+                              hidden: { opacity: 0, scale: 0.6 },
+                              visible: {
+                                opacity: 1,
+                                scale: 1,
+                                transition: {
+                                  type: "spring",
+                                  stiffness: 280,
+                                  damping: 22,
+                                },
+                              },
+                            };
+
+                            return (
+                              <motion.button
+                                type="button"
+                                key={i}
+                                variants={bubbleVariants}
+                                whileHover={{
+                                  scale: 1.06,
+                                  y: -4,
+                                  transition: {
+                                    type: "spring",
+                                    stiffness: 300,
+                                  },
+                                }}
+                                whileTap={{ scale: 0.96 }}
+                                onClick={() =>
+                                  handleAnswerChange(currentQuestion.id, i + 1)
+                                }
+                                className={`flex items-center justify-center rounded-full border-4 transition-all duration-200 font-bold text-white ${
+                                  bubbleSizes[i]
+                                } ${colorSchemes[i]} ${
+                                  isSelected
+                                    ? "ring-4 ring-offset-2 ring-pink-400 scale-110 shadow-xl"
+                                    : "opacity-80 hover:opacity-100 shadow-md"
+                                }`}
+                                title={opt}
+                              >
+                                {bubbleLabels[i]}
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between text-xs md:text-sm text-gray-600 px-2">
+                          <span className="text-center">
+                            Strongly
+                            <br />
+                            Agree
+                          </span>
+                          <span className="text-center">
+                            Strongly
+                            <br />
+                            Disagree
+                          </span>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* QUICK POLL */}
+                    {currentQuestion.type === "quick_poll" && (
+                      <div className="space-y-2 pt-2">
+                        {currentQuestion.options.map((opt, i) => {
+                          const isSelected =
+                            answers[currentQuestion.id] === i + 1;
+                          return (
+                            <motion.button
+                              key={i}
+                              initial={{ opacity: 0, y: 12 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.06 * i + 0.06 }}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() =>
+                                handleAnswerChange(currentQuestion.id, i + 1)
+                              }
+                              className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-sm md:text-base font-semibold ${
+                                isSelected
+                                  ? "border-indigo-500 bg-indigo-50 shadow-sm text-indigo-700"
+                                  : "border-gray-200 bg-white hover:border-indigo-300 text-gray-700"
                               }`}
                             >
-                              {option.label}
-                            </span>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  )}
+                              {opt}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                  {/* DEALBREAKER TOGGLE */}
-                  {currentQuestion.type === "dealbreaker_toggle" && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                    >
-                      <label className="flex items-start p-5 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all border-2 border-gray-200">
-                        <input
-                          type="checkbox"
-                          checked={dealbreakers[currentQuestion.name] || false}
-                          onChange={() =>
-                            handleDealbreakerChange(currentQuestion.name)
-                          }
-                          className="mt-1 w-5 h-5 text-pink-600 border-gray-300 rounded focus:ring-pink-500 cursor-pointer"
-                        />
-                        <span className="ml-4 text-gray-700 text-base md:text-lg">
-                          {currentQuestion.question}
-                        </span>
-                      </label>
-                      <p className="text-center text-xs text-gray-500 mt-3">
-                        (Select all that apply, or proceed without selection)
-                      </p>
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            </AnimatePresence>
+                    {/* EMOJI SCALE */}
+                    {currentQuestion.type === "emoji_scale" && (
+                      <div className="flex flex-col gap-4 pt-2">
+                        {currentQuestion.options.map((option, i) => {
+                          const isSelected =
+                            answers[currentQuestion.id] === option.value;
+                          return (
+                            <motion.button
+                              key={i}
+                              initial={{ opacity: 0, x: -12 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.06 * i + 0.06 }}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() =>
+                                handleAnswerChange(
+                                  currentQuestion.id,
+                                  option.value
+                                )
+                              }
+                              className={`w-full p-3 rounded-lg border-2 transition-all duration-200 flex items-center gap-3 ${
+                                isSelected
+                                  ? "border-yellow-500 bg-yellow-50 shadow-sm"
+                                  : "border-gray-200 bg-white hover:border-yellow-300"
+                              }`}
+                            >
+                              <span className="text-2xl md:text-4xl">
+                                {option.emoji}
+                              </span>
+                              <span
+                                className={`text-sm md:text-lg font-semibold ${
+                                  isSelected
+                                    ? "text-yellow-700"
+                                    : "text-gray-700"
+                                }`}
+                              >
+                                {option.label}
+                              </span>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* GROUPED DEALBREAKERS: this renders only once (synthetic step) */}
+                    {currentQuestion.type === "dealbreaker_toggle" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                      >
+                        <p className="text-sm text-gray-600 mb-3">
+                          Select any deal-breakers that apply. These are grouped
+                          here so you can toggle them in one place.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {originalDealbreakers.map((db) => (
+                            <label
+                              key={db.id}
+                              className="flex items-start p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-all border-2 border-gray-200"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!dealbreakers[db.name]}
+                                onChange={() =>
+                                  handleDealbreakerChange(db.name)
+                                }
+                                className="mt-1 w-4 h-4 text-pink-600 border-gray-300 rounded focus:ring-pink-500 cursor-pointer"
+                              />
+                              <span className="ml-3 text-gray-700 text-sm">
+                                {db.question}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-center text-xs text-gray-500 mt-2">
+                          (You can select multiple. Selections are stored in the
+                          same <code>dealbreakers</code> object and submitted
+                          unchanged to the backend.)
+                        </p>
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* Navigation Buttons */}
           <motion.div
-            className="mt-8 flex items-center justify-between gap-4"
-            initial={{ opacity: 0, y: 20 }}
+            className="mt-4 flex items-center justify-between gap-3"
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.15 }}
           >
             <motion.button
-              whileHover={{ scale: currentIndex === 0 ? 1 : 1.05 }}
+              whileHover={{ scale: currentIndex === 0 ? 1 : 1.03 }}
               whileTap={{ scale: currentIndex === 0 ? 1 : 0.95 }}
               onClick={handlePrevious}
               disabled={currentIndex === 0}
-              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                 currentIndex === 0
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -623,13 +742,13 @@ export default function CompatibilityForm() {
 
             {!isLastQuestion ? (
               <motion.button
-                whileHover={{ scale: isAnswered ? 1.05 : 1 }}
-                whileTap={{ scale: isAnswered ? 0.95 : 1 }}
+                whileHover={{ scale: isAnswered ? 1.03 : 1 }}
+                whileTap={{ scale: isAnswered ? 0.96 : 1 }}
                 onClick={handleNext}
                 disabled={!isAnswered}
-                className={`px-8 py-3 rounded-xl font-semibold transition-all ${
+                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
                   isAnswered
-                    ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white hover:shadow-lg"
+                    ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white hover:shadow"
                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
@@ -637,20 +756,20 @@ export default function CompatibilityForm() {
               </motion.button>
             ) : (
               <motion.button
-                whileHover={{ scale: isSubmitting ? 1 : 1.05 }}
-                whileTap={{ scale: isSubmitting ? 1 : 0.95 }}
+                whileHover={{ scale: isSubmitting ? 1 : 1.03 }}
+                whileTap={{ scale: isSubmitting ? 1 : 0.96 }}
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className={`px-8 py-3 rounded-xl font-semibold transition-all ${
+                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
                   isSubmitting
                     ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-green-500 to-teal-600 text-white hover:shadow-lg"
+                    : "bg-gradient-to-r from-green-500 to-teal-600 text-white hover:shadow"
                 }`}
               >
                 {isSubmitting ? (
-                  <span className="flex items-center">
+                  <span className="flex items-center text-sm">
                     <svg
-                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
@@ -667,7 +786,7 @@ export default function CompatibilityForm() {
                         className="opacity-75"
                         fill="currentColor"
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
+                      />
                     </svg>
                     Submitting...
                   </span>
@@ -682,10 +801,10 @@ export default function CompatibilityForm() {
           <AnimatePresence>
             {message && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className={`mt-4 p-4 rounded-xl text-center font-medium ${
+                exit={{ opacity: 0, y: -10 }}
+                className={`mt-3 p-2 rounded-lg text-center text-sm font-medium ${
                   message.includes("✅")
                     ? "bg-green-100 text-green-700"
                     : "bg-orange-100 text-orange-700"
@@ -701,20 +820,20 @@ export default function CompatibilityForm() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="text-center text-sm text-gray-500 mt-6 space-y-2"
+          transition={{ delay: 0.25 }}
+          className="text-center text-xs text-gray-500 mt-4 space-y-1"
         >
           <p>
-            💡 Use arrow keys to navigate | Press 1-4 for quick text selection
+            💡 Use arrow keys to navigate | Press 1–5 for quick text selection
           </p>
-          <p className="text-xs">
-            {currentQuestion.type === "emoji_scale" && "Click emoji to select"}
-            {currentQuestion.type === "quick_poll" &&
+          <p className="text-[11px]">
+            {currentQuestion?.type === "emoji_scale" && "Click emoji to select"}
+            {currentQuestion?.type === "quick_poll" &&
               "Tap any button to answer"}
-            {currentQuestion.type === "bubble" && "Tap bubble circles to rate"}
-            {currentQuestion.type === "dealbreaker_toggle" &&
+            {currentQuestion?.type === "bubble" && "Tap bubble circles to rate"}
+            {currentQuestion?.type === "dealbreaker_toggle" &&
               "Check boxes that matter to you"}
-            {currentQuestion.type === "text" && "Select an option to continue"}
+            {currentQuestion?.type === "text" && "Select an option to continue"}
           </p>
         </motion.div>
       </div>

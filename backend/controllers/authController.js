@@ -12,8 +12,8 @@ const createToken = (userId) => {
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production" ? true : false, // 👈 false locally
-  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax", // 👈 safer for localhost
+  secure: process.env.NODE_ENV === "production" ? true : false,
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
@@ -42,8 +42,9 @@ exports.sendOtp = async (req, res) => {
 // ✅ Step 2: Verify OTP & Register User
 exports.verifyOtpAndRegister = async (req, res) => {
   try {
-    const { name, email, password, otp } = req.body;
-    if (!name || !email || !password || !otp)
+    const { name, email, password, otp, gender } = req.body;
+    
+    if (!name || !email || !password || !otp || !gender)
       return res.status(400).json({ error: "All fields are required" });
 
     // 🔑 Verify OTP
@@ -56,8 +57,17 @@ exports.verifyOtpAndRegister = async (req, res) => {
     if (userExists)
       return res.status(400).json({ error: "Email already exists" });
 
-    // ✅ Create new user
-    const user = new User({ name, email, password });
+    // ✅ Extract email domain
+    const emailDomain = email.substring(email.lastIndexOf('@')).toLowerCase();
+
+    // ✅ Create new user WITH emailDomain
+    const user = new User({ 
+      name, 
+      email, 
+      password, 
+      gender,
+      emailDomain // ✅ ADD THIS
+    });
     await user.save();
 
     // 🔑 Clean up OTPs
@@ -68,13 +78,13 @@ exports.verifyOtpAndRegister = async (req, res) => {
       expiresIn: "7d",
     });
 
-    // ✅ IMPORTANT: Use consistent cookie settings
+    // ✅ Set cookie
     const isProduction = process.env.NODE_ENV === "production";
     
     res.cookie("token", token, {
       httpOnly: true,
-      secure: isProduction,           // ✅ true only in production
-      sameSite: isProduction ? "None" : "Lax",  // ✅ Only None in production
+      secure: isProduction,
+      sameSite: isProduction ? "None" : "Lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: "/"
     });
@@ -83,19 +93,25 @@ exports.verifyOtpAndRegister = async (req, res) => {
       isProduction,
       sameSite: isProduction ? "None" : "Lax",
       secure: isProduction,
-      userEmail: user.email
+      userEmail: user.email,
+      emailDomain: user.emailDomain // ✅ Log domain
     });
 
     res.status(201).json({
       message: "🎉 Account created & logged in successfully",
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        gender: gender || null,
+        emailDomain: user.emailDomain // ✅ Return domain to frontend
+      },
     });
   } catch (err) {
     console.error("❌ Registration error:", err.message);
     res.status(500).json({ error: "Server error during registration" });
   }
 };
-
 
 // ✅ Forgot Password: Send OTP
 exports.forgotPassword = async (req, res) => {
@@ -149,7 +165,6 @@ exports.resetPassword = async (req, res) => {
 };
 
 // ✅ Login
-// ✅ LOGIN CONTROLLER - MUST SET COOKIE CORRECTLY
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -180,11 +195,11 @@ exports.login = async (req, res) => {
 
     // ✅ SET COOKIE WITH CORRECT OPTIONS
     res.cookie('token', token, {
-      httpOnly: true,                    // Cannot be accessed by JavaScript
-      secure: process.env.NODE_ENV === 'production',  // HTTPS only in production
-      sameSite: 'Lax',                   // Allow cross-site cookies
-      maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 days in milliseconds
-      path: '/'                          // Available on all routes
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
     });
 
     console.log('✅ Login successful, cookie set:', token.substring(0, 10) + '...');
@@ -195,7 +210,8 @@ exports.login = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        emailDomain: user.emailDomain // ✅ Return domain
       }
     });
   } catch (err) {
@@ -203,4 +219,3 @@ exports.login = async (req, res) => {
     res.status(500).json({ error: 'Login failed' });
   }
 };
-
