@@ -1,3 +1,4 @@
+// Signup.jsx (client)
 "use client";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -9,6 +10,7 @@ const Signup = () => {
     name: "",
     email: "",
     password: "",
+    gender: "", // <-- new
   });
   const [step, setStep] = useState("signup"); // signup → otp
   const [otp, setOtp] = useState("");
@@ -18,17 +20,18 @@ const Signup = () => {
   const handleSignup = async (e) => {
     e.preventDefault();
 
+    // optional client-side check for gender
+    if (!formData.gender) {
+      alert("Please select your gender.");
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
       });
-
-      // if (!formData.email.endsWith("@kiet.edu")) {
-      //   alert("⚠️ Only emails ending with @kiet.edu are allowed");
-      //   return;
-      // }
 
       if (response.ok) {
         alert("✅ OTP sent to your email!");
@@ -44,38 +47,33 @@ const Signup = () => {
   };
 
   // STEP 2: Verify OTP & Create Account
-const handleVerifyOtp = async (e) => {
-  e.preventDefault();
-  try {
-    const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",  // ✅ Important: includes cookies
-      body: JSON.stringify({ ...formData, otp }),
-    });
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    try {
+      // send entire formData (including gender) along with otp
+      const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...formData, otp }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (response.ok) {
-      console.log('✅ Signup successful:', data);
-      
-      // ✅ Verify cookie was set
-      const cookies = document.cookie.split(';').map(c => c.trim());
-      console.log('🍪 Current cookies:', cookies);
-      
-      alert(data.message);
-      
-      // ✅ Navigate to compatibility form - cookie is already set!
-      navigate("/compatibilityform");
-    } else {
-      alert("⚠️ " + (data.error || "Invalid OTP or registration error"));
+      if (response.ok) {
+        console.log("✅ Signup successful:", data);
+        // show cookies for debugging (optional)
+        console.log("🍪 Current cookies:", document.cookie.split(";").map(c => c.trim()));
+        alert(data.message || "Registered successfully");
+        navigate("/compatibilityform");
+      } else {
+        alert("⚠️ " + (data.error || "Invalid OTP or registration error"));
+      }
+    } catch (err) {
+      console.error("❌ Error verifying OTP:", err);
+      alert("❌ Failed to connect to server");
     }
-  } catch (err) {
-    console.error("❌ Error verifying OTP:", err);
-    alert("❌ Failed to connect to server");
-  }
-};
-
+  };
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
@@ -87,7 +85,7 @@ const handleVerifyOtp = async (e) => {
           frameBorder="0"
           allow="autoplay; fullscreen; xr-spatial-tracking"
           style={{ pointerEvents: "auto" }}
-        ></iframe>
+        />
       </div>
 
       <div className="relative z-10 w-full h-full flex items-end justify-center px-4 pb-10">
@@ -95,48 +93,61 @@ const handleVerifyOtp = async (e) => {
           // SIGNUP FORM
           <form
             onSubmit={handleSignup}
-            className="backdrop-blur-md border-2 border-black rounded-xl shadow-lg p-6 w-full max-w-md"
+            className="backdrop-blur-md border border-gray-900/10 rounded-xl shadow-lg p-6 w-full max-w-md bg-white/70"
           >
-            <h2 className="text-2xl font-bold text-center mb-4 border-b-2 border-black pb-2">
-              Sign Up
-            </h2>
-            <h4 className="font-bold text-center pb-2">
-              Use your college email only!!
-            </h4>
+            <h2 className="text-2xl font-bold text-center mb-4">Sign Up</h2>
+            <h4 className="font-medium text-center mb-4">Use your college email only</h4>
 
             <input
               type="text"
               placeholder="Name"
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full p-2 mb-3 bg-white border-2 border-black rounded"
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full p-2 mb-3 bg-white border border-gray-200 rounded"
+              required
             />
+
             <input
               type="email"
               placeholder="Email"
               value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              className="w-full p-2 mb-3 bg-white border-2 border-black rounded"
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full p-2 mb-3 bg-white border border-gray-200 rounded"
+              required
             />
+
             <input
               type="password"
               placeholder="Password"
               value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              className="w-full p-2 mb-4 bg-white border-2 border-black rounded"
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full p-2 mb-3 bg-white border border-gray-200 rounded"
+              required
+              minLength={6}
             />
 
+            {/* Gender select (new) */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                required
+                className="w-full p-2 bg-white border border-gray-200 rounded"
+              >
+                <option value="">Select gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               type="submit"
-              className="w-full px-4 py-2 rounded-xl text-pink-600 hover:bg-pink-100 transition font-medium backdrop-blur-sm"
+              className="w-full px-4 py-2 rounded-xl text-white bg-pink-500 hover:bg-pink-600 transition font-medium"
             >
               Get OTP
             </motion.button>
@@ -145,25 +156,24 @@ const handleVerifyOtp = async (e) => {
           // OTP VERIFICATION FORM
           <form
             onSubmit={handleVerifyOtp}
-            className="backdrop-blur-md border-2 border-black rounded-xl shadow-lg p-6 w-full max-w-md"
+            className="backdrop-blur-md border border-gray-900/10 rounded-xl shadow-lg p-6 w-full max-w-md bg-white/70"
           >
-            <h2 className="text-2xl font-bold text-center mb-4 border-b-2 border-black pb-2">
-              Verify OTP
-            </h2>
+            <h2 className="text-2xl font-bold text-center mb-4">Verify OTP</h2>
 
             <input
               type="text"
               placeholder="Enter OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              className="w-full p-2 mb-4 bg-white border-2 border-black rounded"
+              className="w-full p-2 mb-4 bg-white border border-gray-200 rounded"
+              required
             />
 
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               type="submit"
-              className="w-full px-4 py-2 rounded-xl text-pink-600 hover:bg-pink-100 transition font-medium backdrop-blur-sm"
+              className="w-full px-4 py-2 rounded-xl text-white bg-pink-500 hover:bg-pink-600 transition font-medium"
             >
               Verify & Register
             </motion.button>

@@ -1,9 +1,7 @@
 // ============================================================================
-// 🎯 FINAL QUESTIONNAIRE - GUARANTEED STRICT ORDER
-// TEXT QUESTIONS FIRST → BUBBLE QUESTIONS → DEALBREAKER TOGGLES
-// ============================================================================
-// This version uses a FLAT array with guaranteed strict ordering
-// No mixing of types - questions are physically arranged in order
+// 🎯 OPTIMIZED QUESTIONNAIRE - 26 QUESTIONS (REORGANIZED)
+// Text Questions → Bubble Questions → Dealbreaker Questions
+// Enhanced for relationship compatibility & personality profiling
 // ============================================================================
 
 export const QUESTION_TYPES = {
@@ -30,13 +28,12 @@ export const emojiScaleOptions = [
 ];
 
 // ============================================================================
-// SINGLE FLAT ARRAY - NO MIXING TYPES
-// This is the ONLY array - questions appear in EXACT order they will be shown
+// REORGANIZED 26-QUESTION ARRAY - TEXT FIRST, THEN BUBBLE, THEN DEALBREAKER
 // ============================================================================
 
 export const personalityQuestions = [
-  // ==================== PART 1: TEXT QUESTIONS (15 Questions) ====================
-  // Questions 0-14 are 100% TEXT only
+  // ==================== PHASE 1: TEXT QUESTIONS (13 Total) ====================
+  // SECTION 1: Welcome & Ready? (1 Text)
   {
     id: 1,
     section: 1,
@@ -45,28 +42,18 @@ export const personalityQuestions = [
     type: QUESTION_TYPES.TEXT,
     question: "What's your current relationship status?",
     options: [
-      'Single and looking',
+      'Single and actively looking',
       'Single but open to meeting someone',
       'Casually dating',
       'Exploring what\'s out there'
     ],
-    required: true
+    required: true,
+    phase: 'text'
   },
+
+  // SECTION 2: Love & Relationships (5 Text)
   {
     id: 3,
-    section: 1,
-    type: QUESTION_TYPES.TEXT,
-    question: 'What matters most in your dating journey?',
-    options: [
-      'Finding a genuine connection',
-      'Taking things slow and exploring',
-      'Building something long-term',
-      'Meeting interesting people'
-    ],
-    required: true
-  },
-  {
-    id: 4,
     section: 2,
     sectionTitle: 'Love & Relationships',
     sectionEmoji: '💕',
@@ -78,23 +65,12 @@ export const personalityQuestions = [
       'By spending quality time together',
       'Through physical affection or closeness'
     ],
-    required: true
+    compatibilityWeight: 'high',
+    required: true,
+    phase: 'text'
   },
   {
-    id: 6,
-    section: 2,
-    type: QUESTION_TYPES.TEXT,
-    question: 'What does emotional intimacy mean to you?',
-    options: [
-      'Deep conversations about our feelings and fears',
-      'Being vulnerable and fully known by someone',
-      'Feeling safe to be completely myself',
-      'A combination of all of these'
-    ],
-    required: true
-  },
-  {
-    id: 8,
+    id: 4,
     section: 2,
     type: QUESTION_TYPES.TEXT,
     question: 'How do you handle conflicts in a relationship?',
@@ -104,10 +80,12 @@ export const personalityQuestions = [
       'Avoid arguments until it settles naturally',
       'Get emotional but resolve it quickly'
     ],
-    required: true
+    compatibilityWeight: 'critical',
+    required: true,
+    phase: 'text'
   },
   {
-    id: 10,
+    id: 5,
     section: 2,
     type: QUESTION_TYPES.TEXT,
     question: "What's your love language?",
@@ -118,69 +96,13 @@ export const personalityQuestions = [
       'Quality time',
       'Physical touch'
     ],
-    required: true
+    compatibilityWeight: 'critical',
+    required: true,
+    phase: 'text'
   },
   {
-    id: 19,
-    section: 4,
-    sectionTitle: 'Life & Goals',
-    sectionEmoji: '🚀',
-    type: QUESTION_TYPES.TEXT,
-    question: 'Where do you see yourself in 5 years?',
-    options: [
-      'Established in my career with a partner',
-      'Focused on personal growth and exploration',
-      'Building something meaningful with someone',
-      'Open to wherever life takes me'
-    ],
-    required: true
-  },
-  {
-    id: 21,
-    section: 4,
-    type: QUESTION_TYPES.TEXT,
-    question: 'What role does travel play in your ideal life?',
-    options: [
-      'I love exploring new places regularly',
-      "I enjoy travel but don't need it constantly",
-      'I prefer establishing roots in one place',
-      'Adventure over stability'
-    ],
-    required: true
-  },
-  {
-    id: 23,
-    section: 4,
-    type: QUESTION_TYPES.TEXT,
-    question: 'How important is financial stability to you?',
-    options: [
-      'Very important - stability equals security',
-      'Important, but I value adventure too',
-      "I'm more about experiences than money",
-      'Depends on the situation'
-    ],
-    required: true
-  },
-  {
-    id: 27,
-    section: 5,
-    sectionTitle: 'Money Matters',
-    sectionEmoji: '💰',
-    type: QUESTION_TYPES.TEXT,
-    question: 'How do you prefer to handle shared expenses with a partner?',
-    options: [
-      'Split everything 50/50',
-      'Split based on income',
-      'One person handles finances',
-      'Depends on the situation'
-    ],
-    required: true
-  },
-  {
-    id: 29,
-    section: 6,
-    sectionTitle: 'Connection & Communication',
-    sectionEmoji: '🔗',
+    id: 8,
+    section: 2,
     type: QUESTION_TYPES.TEXT,
     question: 'When your partner is upset, how do you usually respond?',
     options: [
@@ -190,11 +112,13 @@ export const personalityQuestions = [
       'Feel unsure how to help'
     ],
     attachmentIndicator: true,
-    required: true
+    compatibilityWeight: 'high',
+    required: true,
+    phase: 'text'
   },
   {
-    id: 32,
-    section: 6,
+    id: 9,
+    section: 2,
     type: QUESTION_TYPES.TEXT,
     question: 'How comfortable are you with emotional vulnerability?',
     options: [
@@ -204,92 +128,100 @@ export const personalityQuestions = [
       'I keep some walls up'
     ],
     attachmentIndicator: true,
-    required: true
-  },
-  {
-    id: 34,
-    section: 6,
-    type: QUESTION_TYPES.TEXT,
-    question: 'How do you prefer to discuss difficult topics?',
-    options: [
-      'Direct and honest, get to the point',
-      'Gently, with care for feelings',
-      'After cooling down, when emotions settle',
-      'Depends on the situation'
-    ],
-    required: true
-  },
-  {
-    id: 35,
-    section: 7,
-    sectionTitle: 'Final Compatibility Check',
-    sectionEmoji: '⚠️',
-    type: QUESTION_TYPES.TEXT,
-    question: 'What does loyalty mean to you?',
-    options: [
-      'Being emotionally and physically faithful',
-      'Being transparent and honest always',
-      'Standing by each other through challenges',
-      'Prioritizing each other above others'
-    ],
-    required: true
+    compatibilityWeight: 'critical',
+    required: true,
+    phase: 'text'
   },
 
-  // ==================== PART 2: EMOJI SCALE QUESTIONS (2 Questions) ====================
-  // Questions 15-16 are EMOJI SCALE
+  // SECTION 4: Values & Lifestyle (3 Text)
+  {
+    id: 17,
+    section: 4,
+    sectionTitle: 'Values & Lifestyle',
+    sectionEmoji: '🌟',
+    type: QUESTION_TYPES.TEXT,
+    question: 'How important is financial stability in a relationship?',
+    options: [
+      "Very important - it's a foundation for security",
+      'Important, but I value experiences over money',
+      "I'm flexible - we'll figure it out together",
+      'Not very important - love matters more'
+    ],
+    compatibilityWeight: 'high',
+    required: true,
+    phase: 'text'
+  },
+  {
+    id: 18,
+    section: 4,
+    type: QUESTION_TYPES.TEXT,
+    question: 'How would you prefer to spend a free weekend with your partner?',
+    options: [
+      'Adventure activities or exploring new places',
+      'Quiet time at home, relaxing together',
+      'Social gatherings with friends and family',
+      'Mix of activities - keep it spontaneous'
+    ],
+    compatibilityWeight: 'medium',
+    required: true,
+    phase: 'text'
+  },
+  {
+    id: 24,
+    section: 5,
+    sectionTitle: 'Connection & Communication',
+    sectionEmoji: '🔗',
+    type: QUESTION_TYPES.TEXT,
+    question: 'How do you prefer to handle shared expenses with a partner?',
+    options: [
+      'Split everything 50/50',
+      'Split based on income proportion',
+      'One person handles finances primarily',
+      'Flexible - depends on the situation'
+    ],
+    compatibilityWeight: 'medium',
+    required: true,
+    phase: 'text'
+  },
+
+  // ==================== PHASE 2: EMOJI SCALE (1 Total) ====================
   {
     id: 2,
     section: 1,
     type: QUESTION_TYPES.EMOJI_SCALE,
-    question: 'How ready do you feel for a relationship right now?',
+    question: 'How ready do you feel for a committed relationship right now?',
     options: emojiScaleOptions,
-    required: true
-  },
-  {
-    id: 26,
-    section: 5,
-    type: QUESTION_TYPES.EMOJI_SCALE,
-    question: 'How comfortable are you discussing finances in a relationship?',
-    options: emojiScaleOptions,
-    required: true
+    required: true,
+    phase: 'bubble'
   },
 
-  // ==================== PART 3: BUBBLE SCALE QUESTIONS (18 Questions) ====================
-  // Questions 17-34 are 100% BUBBLE only
+  // ==================== PHASE 3: BUBBLE QUESTIONS (12 Total) ====================
+  // SECTION 2: Love & Relationships (2 Bubble)
   {
-    id: 5,
+    id: 6,
     section: 2,
     type: QUESTION_TYPES.BUBBLE,
-    question: 'I express my feelings openly and directly.',
+    question: 'I need reassurance from my partner regularly.',
     options: bubbleOptions,
-    required: true
+    attachmentIndicator: true,
+    personalityDimension: 'Neuroticism',
+    required: true,
+    phase: 'bubble'
   },
   {
     id: 7,
     section: 2,
     type: QUESTION_TYPES.BUBBLE,
-    question: 'When my partner is upset, I know how to comfort them.',
-    options: bubbleOptions,
-    required: true
-  },
-  {
-    id: 9,
-    section: 2,
-    type: QUESTION_TYPES.BUBBLE,
-    question: 'I need reassurance from my partner regularly.',
-    options: bubbleOptions,
-    required: true
-  },
-  {
-    id: 11,
-    section: 2,
-    type: QUESTION_TYPES.BUBBLE,
     question: 'Personal space in a relationship is essential for me.',
     options: bubbleOptions,
-    required: true
+    attachmentIndicator: true,
+    required: true,
+    phase: 'bubble'
   },
+
+  // SECTION 3: Your Personality (7 Bubble)
   {
-    id: 12,
+    id: 10,
     section: 3,
     sectionTitle: 'Your Personality',
     sectionEmoji: '🎭',
@@ -297,106 +229,112 @@ export const personalityQuestions = [
     question: 'I enjoy being the center of attention.',
     options: bubbleOptions,
     personalityDimension: 'Extraversion',
-    required: true
+    required: true,
+    phase: 'bubble'
   },
   {
-    id: 14,
+    id: 12,
     section: 3,
     type: QUESTION_TYPES.BUBBLE,
     question: "I like trying new things, even if they're risky.",
     options: bubbleOptions,
     personalityDimension: 'Openness',
-    required: true
+    required: true,
+    phase: 'bubble'
   },
   {
-    id: 15,
+    id: 13,
     section: 3,
     type: QUESTION_TYPES.BUBBLE,
     question: "I find it easy to empathize with others' feelings.",
     options: bubbleOptions,
     personalityDimension: 'Agreeableness',
-    required: true
+    compatibilityWeight: 'critical',
+    required: true,
+    phase: 'bubble'
   },
   {
-    id: 17,
+    id: 14,
     section: 3,
     type: QUESTION_TYPES.BUBBLE,
     question: 'I make decisions based on logic rather than emotions.',
     options: bubbleOptions,
     personalityDimension: 'Conscientiousness',
-    required: true
+    required: true,
+    phase: 'bubble'
   },
   {
-    id: 18,
+    id: 16,
     section: 3,
     type: QUESTION_TYPES.BUBBLE,
-    question: 'I value honesty over politeness.',
+    question: 'I tend to plan my life in detail.',
     options: bubbleOptions,
-    personalityDimension: 'Character',
-    required: true
+    personalityDimension: 'Conscientiousness',
+    required: true,
+    phase: 'bubble'
+  },
+
+  // SECTION 4: Values & Lifestyle (2 Bubble)
+  {
+    id: 19,
+    section: 4,
+    type: QUESTION_TYPES.BUBBLE,
+    question: "I feel anxious when I haven't heard from my partner for a while.",
+    options: bubbleOptions,
+    attachmentIndicator: true,
+    personalityDimension: 'Neuroticism',
+    required: true,
+    phase: 'bubble'
   },
   {
     id: 20,
     section: 4,
     type: QUESTION_TYPES.BUBBLE,
-    question: 'Career advancement is important to my happiness.',
+    question: 'I believe compromising in a relationship means losing part of yourself.',
     options: bubbleOptions,
-    required: true
+    personalityDimension: 'Agreeableness',
+    compatibilityWeight: 'high',
+    required: true,
+    phase: 'bubble'
   },
+
+  // SECTION 5: Connection & Communication (3 Bubble)
   {
-    id: 24,
-    section: 4,
-    type: QUESTION_TYPES.BUBBLE,
-    question: 'I tend to plan my life in detail.',
-    options: bubbleOptions,
-    required: true
-  },
-  {
-    id: 28,
+    id: 21,
     section: 5,
-    type: QUESTION_TYPES.BUBBLE,
-    question: "I'm comfortable with my partner having debt.",
-    options: bubbleOptions,
-    required: true
-  },
-  {
-    id: 30,
-    section: 6,
     type: QUESTION_TYPES.BUBBLE,
     question: 'I need frequent communication throughout the day.',
     options: bubbleOptions,
     attachmentIndicator: true,
-    required: true
+    compatibilityWeight: 'medium',
+    required: true,
+    phase: 'bubble'
   },
   {
-    id: 33,
-    section: 6,
+    id: 22,
+    section: 5,
     type: QUESTION_TYPES.BUBBLE,
-    question: 'I tend to apologize first when we have conflicts.',
+    question: 'I prefer to handle problems on my own before involving my partner.',
     options: bubbleOptions,
-    required: true
+    attachmentIndicator: true,
+    required: true,
+    phase: 'bubble'
   },
   {
-    id: 36,
-    section: 7,
+    id: 23,
+    section: 5,
     type: QUESTION_TYPES.BUBBLE,
-    question: 'I forgive people easily.',
+    question: 'I am comfortable expressing my needs and desires directly.',
     options: bubbleOptions,
-    required: true
-  },
-  {
-    id: 37,
-    section: 7,
-    type: QUESTION_TYPES.BUBBLE,
-    question: "I enjoy helping others achieve their goals.",
-    options: bubbleOptions,
-    required: true
+    attachmentIndicator: true,
+    compatibilityWeight: 'high',
+    required: true,
+    phase: 'bubble'
   },
 
-  // ==================== PART 4: QUICK POLL QUESTIONS (5 Questions) ====================
-  // Questions 35-39 are QUICK POLL
+  // ==================== PHASE 4: QUICK POLL (2 Total) ====================
   {
-    id: 13,
+    id: 11,
     section: 3,
     type: QUESTION_TYPES.QUICK_POLL,
     question: 'In new social situations, I typically...?',
@@ -406,10 +344,11 @@ export const personalityQuestions = [
       'Prefer one-on-one conversations'
     ],
     personalityDimension: 'Extraversion',
-    required: true
+    required: true,
+    phase: 'bubble'
   },
   {
-    id: 16,
+    id: 15,
     section: 3,
     type: QUESTION_TYPES.QUICK_POLL,
     question: 'I tend to get stressed when things go wrong?',
@@ -419,96 +358,83 @@ export const personalityQuestions = [
       "Not really, I'm pretty calm"
     ],
     personalityDimension: 'Neuroticism',
-    required: true
-  },
-  {
-    id: 22,
-    section: 4,
-    type: QUESTION_TYPES.QUICK_POLL,
-    question: 'How do you like to spend your free time?',
-    options: [
-      'With friends and social activities',
-      'With a partner, one-on-one',
-      'Alone or pursuing hobbies'
-    ],
-    required: true
-  },
-  {
-    id: 25,
-    section: 5,
-    type: QUESTION_TYPES.QUICK_POLL,
-    question: "What's your approach to money?",
-    options: [
-      'Save first, spend later',
-      'Balance saving and enjoying',
-      'Enjoy now, worry later'
-    ],
-    required: true
-  },
-  {
-    id: 31,
-    section: 6,
-    type: QUESTION_TYPES.QUICK_POLL,
-    question: "When you're stressed, I prefer to...",
-    options: [
-      'Talk it out with my partner',
-      'Have space to process alone',
-      'Do something to distract myself'
-    ],
-    attachmentIndicator: true,
-    required: true
+    required: true,
+    phase: 'bubble'
   },
 
-  // ==================== PART 5: DEALBREAKER TOGGLE QUESTIONS (5 Questions) ====================
-  // Questions 40-44 are 100% DEALBREAKER TOGGLE only
+  // ==================== PHASE 5: DEALBREAKER TOGGLES (5 Total) ====================
   {
     id: 'db_1',
-    section: 7,
+    section: 6,
+    sectionTitle: 'Relationship Dealbreakers',
+    sectionEmoji: '⚠️',
     type: QUESTION_TYPES.DEALBREAKER_TOGGLE,
-    question: 'Must agree on having kids',
+    question: 'Must agree on having/not having children',
     name: 'kids',
-    required: true
+    compatibilityWeight: 'absolute',
+    required: true,
+    phase: 'dealbreaker'
   },
   {
     id: 'db_2',
-    section: 7,
+    section: 6,
     type: QUESTION_TYPES.DEALBREAKER_TOGGLE,
-    question: 'Must agree on monogamy',
+    question: 'Must agree on monogamy vs open relationship',
     name: 'monogamy',
-    required: true
+    compatibilityWeight: 'absolute',
+    required: true,
+    phase: 'dealbreaker'
   },
   {
     id: 'db_3',
-    section: 7,
+    section: 6,
     type: QUESTION_TYPES.DEALBREAKER_TOGGLE,
     question: 'Must align on religion/spirituality',
     name: 'religion',
-    required: true
+    compatibilityWeight: 'absolute',
+    required: true,
+    phase: 'dealbreaker'
   },
   {
     id: 'db_4',
-    section: 7,
+    section: 6,
     type: QUESTION_TYPES.DEALBREAKER_TOGGLE,
     question: 'Must share similar values (political, social)',
     name: 'values',
-    required: true
+    compatibilityWeight: 'absolute',
+    required: true,
+    phase: 'dealbreaker'
   },
   {
     id: 'db_5',
-    section: 7,
+    section: 6,
     type: QUESTION_TYPES.DEALBREAKER_TOGGLE,
     question: 'Must share lifestyle preferences (smoking, drinking, diet)',
     name: 'lifestyle',
-    required: true
+    compatibilityWeight: 'absolute',
+    required: true,
+    phase: 'dealbreaker'
   }
 ];
 
 // Verify array length
-if (personalityQuestions.length !== 42) {
+if (personalityQuestions.length !== 26) {
   console.error(
-    `❌ ERROR: personalityQuestions has ${personalityQuestions.length} questions, should have 42!`
+    `❌ ERROR: personalityQuestions has ${personalityQuestions.length} questions, should have 26!`
   );
 }
+
+// ============================================================================
+// QUESTION PHASE SEPARATION
+// ============================================================================
+
+export const getQuestionsByPhase = () => {
+  return {
+    text: personalityQuestions.filter(q => q.phase === 'text'),
+    bubble: personalityQuestions.filter(q => q.phase === 'bubble'),
+    dealbreaker: personalityQuestions.filter(q => q.phase === 'dealbreaker')
+  };
+};
 
 // ============================================================================
 // STRICT ORDERING VERIFICATION
@@ -522,29 +448,9 @@ export const verifyOrdering = () => {
   let bubbleCount = 0;
   let pollCount = 0;
   let dealCount = 0;
-  let inTextSection = true;
-  let inEmojiSection = false;
-  let inBubbleSection = false;
-  let inPollSection = false;
-  let inDealSection = false;
 
-  personalityQuestions.forEach((q, index) => {
+  personalityQuestions.forEach((q) => {
     const type = q.type;
-
-    // Check if we're violating strict order
-    if (inTextSection && type !== QUESTION_TYPES.TEXT && type !== QUESTION_TYPES.EMOJI_SCALE) {
-      inTextSection = false;
-      inEmojiSection = false;
-      inBubbleSection = true;
-    } else if (inBubbleSection && type !== QUESTION_TYPES.BUBBLE) {
-      inBubbleSection = false;
-      inPollSection = true;
-    } else if (inPollSection && type !== QUESTION_TYPES.QUICK_POLL) {
-      inPollSection = false;
-      inDealSection = true;
-    }
-
-    // Count each type
     if (type === QUESTION_TYPES.TEXT) textCount++;
     if (type === QUESTION_TYPES.EMOJI_SCALE) emojiCount++;
     if (type === QUESTION_TYPES.BUBBLE) bubbleCount++;
@@ -560,34 +466,8 @@ export const verifyOrdering = () => {
   console.log(`   Dealbreaker Toggle: ${dealCount} questions`);
   console.log(`   Total: ${textCount + emojiCount + bubbleCount + pollCount + dealCount} questions`);
 
-  // Find any out-of-order questions
-  let allCorrect = true;
-  let currentType = QUESTION_TYPES.TEXT;
-  const typeOrder = [QUESTION_TYPES.TEXT, QUESTION_TYPES.EMOJI_SCALE, QUESTION_TYPES.BUBBLE, QUESTION_TYPES.QUICK_POLL, QUESTION_TYPES.DEALBREAKER_TOGGLE];
-
-  personalityQuestions.forEach((q, index) => {
-    const expectedTypeIndex = typeOrder.indexOf(currentType);
-    const actualTypeIndex = typeOrder.indexOf(q.type);
-
-    if (actualTypeIndex < expectedTypeIndex) {
-      console.error(
-        `❌ ERROR at question ${index}: Found ${q.type} after ${currentType}`
-      );
-      allCorrect = false;
-    }
-
-    if (actualTypeIndex > expectedTypeIndex) {
-      currentType = q.type;
-    }
-  });
-
-  if (allCorrect) {
-    console.log('✅ Strict ordering VERIFIED - All questions in correct order!');
-  } else {
-    console.error('❌ Ordering violation detected!');
-  }
-
-  return allCorrect;
+  const total = textCount + emojiCount + bubbleCount + pollCount + dealCount;
+  return total === 26;
 };
 
 // Run verification
@@ -604,10 +484,9 @@ export const getSectionInfo = (section) => {
     1: { emoji: "⚡", title: "Welcome & Ready?" },
     2: { emoji: "💕", title: "Love & Relationships" },
     3: { emoji: "🎭", title: "Your Personality" },
-    4: { emoji: "🚀", title: "Life & Goals" },
-    5: { emoji: "💰", title: "Money Matters" },
-    6: { emoji: "🔗", title: "Connection & Communication" },
-    7: { emoji: "⚠️", title: "Final Compatibility Check" },
+    4: { emoji: "🌟", title: "Values & Lifestyle" },
+    5: { emoji: "🔗", title: "Connection & Communication" },
+    6: { emoji: "⚠️", title: "Relationship Dealbreakers" },
   };
   return sectionInfo[section] || { emoji: "📋", title: "Questions" };
 };

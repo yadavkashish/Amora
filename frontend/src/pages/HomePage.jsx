@@ -1,168 +1,328 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import RotatingHeading from '../components/RotatingHeading';
+"use client";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  Heart,
+  Search,
+  ShieldCheck,
+  Star,
+  Users,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import Header from "../components/Header";
+import axios from "axios";
+import { useState } from "react";
 
+// Main Component for the Home Page
 export default function HomePage() {
-  const [isMobile, setIsMobile] = useState(false);
+  const BASE_URL = import.meta.env.VITE_API_URL;
+  const API_URL = `${BASE_URL}` || "http://localhost:5000";
+  const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize(); // initial check
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const checkAuth = async () => {
+      try {
+        await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true });
+        setIsLoggedIn(true);
+      } catch {
+        setIsLoggedIn(false);
+      }
+    };
+    checkAuth();
   }, []);
 
   return (
-    <main
-      className="relative w-full min-h-screen overflow-hidden bg-center bg-fixed md:bg-contain"
-      style={{
-        backgroundImage: !isMobile ? "url('/images/bg5.jpg')" : 'none',
-        backgroundColor: isMobile ? '#ffe4e6' : 'transparent',
-      }}
-    >
-      {/* Dark overlay */}
-      <div className="absolute inset-0 z-10" />
+    <div className="min-h-screen font-sans">
+      <style>{`
+        :root{
+          --page-bg: linear-gradient(180deg,#fffafc,#fbfbff);
+          --card-bg: #ffffff;
+          --fg: #081124;
+          --muted: #6b7280;
+          --primary: #7c3aed; /* purple */
+          --accent: #ff3cac;  /* pink */
+          --cyan: #06b6d4;    /* cyan */
+          --glass: rgba(255,255,255,0.7);
+          --border: rgba(2,6,23,0.06);
+          --shadow-elegant: 0 12px 40px rgba(2,6,23,0.06);
+        }
+
+        body { background: var(--page-bg); color: var(--fg); }
+
+        /* small helpers */
+        .gradient-text {
+          background: linear-gradient(90deg, var(--accent), var(--primary));
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+        .cta-button-glow {
+          box-shadow: 0 8px 30px rgba(124,58,237,0.12), 0 0 8px rgba(255,60,124,0.06);
+        }
+
+        /* hero */
+        .hero-wrap { position: relative; padding-top: 5.5rem; padding-bottom: 4.5rem; overflow: hidden; }
+        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(124,58,237,0.03), transparent 40%); pointer-events: none; }
+
+        /* cards */
+        .feature-card, .testimonial-card, .card {
+          background: var(--card-bg);
+          border-radius: 1rem;
+          border: 1px solid var(--border);
+          box-shadow: var(--shadow-elegant);
+        }
+
+        .feature-icon {
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          width:56px;height:56px;border-radius:999px;
+          background: linear-gradient(180deg, rgba(124,58,237,0.06), rgba(6,182,212,0.05));
+        }
+
+        .cta-primary {
+          background: linear-gradient(90deg, var(--primary), var(--cyan));
+          color: white;
+          padding: 0.9rem 1.6rem;
+          border-radius: 999px;
+          font-weight: 800;
+        }
+
+        .cta-accent {
+          background: linear-gradient(90deg, var(--accent), var(--primary));
+          color: white;
+          padding: 0.7rem 1.2rem;
+          border-radius: 12px;
+          font-weight: 700;
+        }
+
+        .muted { color: var(--muted); }
+        .small { font-size: 0.95rem; }
+
+        /* testimonial avatar */
+        .t-avatar { width:48px;height:48px;border-radius:999px;border:2px solid rgba(124,58,237,0.12); }
+
+        /* step bubble */
+        .step-bubble { width:64px;height:64px;border-radius:999px;background:linear-gradient(180deg,var(--accent),var(--primary)); display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:1.25rem; }
+
+        /* responsive container widths */
+        .container { max-width:1100px;margin:0 auto;padding:0 1.25rem; }
+
+        /* subtle decorative shapes */
+        .decor-heart { opacity:0.08; position:absolute; left:8%; top:8%; transform:translate(-50%,-50%); filter: blur(1px); }
+        .decor-star { opacity:0.06; position:absolute; right:10%; top:50%; transform:translateY(-50%); filter: blur(1px); }
+
+        footer { background: transparent; border-top: 1px solid rgba(2,6,23,0.03); }
+      `}</style>
+
+      <Header />
 
       {/* Hero Section */}
-      <section className="relative z-20 w-full min-h-screen flex flex-col md:flex-row items-center justify-center">
-        {/* Left / Top */}
-        <div className="w-full h-screen md:h-full flex flex-col justify-center items-center px-6 md:px-12 text-white z-30 text-center">
-          <RotatingHeading />
-          <p className="mt-4 bg-white text-base md:text-xl max-w-md animate-fade-in-up delay-200 text-black rounded px-2 py-1">
-            Join Amora— Where stories begin, and sparks fly.
-          </p>
-          <a
-            href="/signup"
-            className="mt-6 bg-green-400 hover:bg-pink-500 transition px-6 py-3 rounded-full text-white font-bold text-lg shadow-lg hover:scale-105 animate-fade-in-up delay-400"
-          >
-            Get Started
-          </a>
-        </div>
+      <main
+        className="hero-wrap text-center relative"
+        style={{ paddingTop: "7rem" }}
+      >
+        <div className="hero-overlay" />
 
-        {/* Right / Bottom */}
-        <div className="w-full md:w-1/2 h-64 md:h-full mt-8 md:mt-0">
-          {/* Lanyard or image component can go here */}
+        {/* decorative shapes (very subtle) */}
+        <Heart className="decor-heart" size={220} color="#ffb6e6" />
+        <Star className="decor-star" size={140} color="#ffd580" />
+
+        <div className="container">
+          <motion.h1
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7 }}
+            className="text-4xl md:text-6xl font-extrabold mb-5"
+            style={{ lineHeight: 1.02 }}
+          >
+            Find Your <span className="gradient-text">Perfect Match</span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.15 }}
+            className="max-w-3xl mx-auto small muted mb-8"
+          >
+            Join a friendly community built around personality-first matching.
+            We help you connect with people who actually fit your values and
+            vibe.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            style={{ marginBottom: "1px" }} // ✅ ADDED GAP BELOW BUTTON
+          >
+            {isLoggedIn ? (
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="cta-accent cta-button-glow"
+              >
+                Explore Matches ❤️
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate("/signup")}
+                className="cta-primary cta-button-glow"
+              >
+                Find Your Soulmate 💖
+              </button>
+            )}
+          </motion.div>
         </div>
-      </section>
+      </main>
 
       {/* Features Section */}
-      <section className="w-full relative z-20 py-20">
-        <div className={`absolute w-full h-full top-0 left-0 z-0 heart-background animate-floating-hearts ${isMobile ? 'hidden' : 'block'}`} />
-        <div className="relative z-10 text-center space-y-6 px-4">
-          <span className="text-4xl font-bold text-pink-700 bg-white">Why AMORA?</span>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mt-10">
+      <section id="features" className="py-16">
+        <div className="container">
+          <h2 className="text-3xl font-bold text-center mb-10">
+            Why Choose Us?
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard
-              img="https://cdn.dribbble.com/users/1894420/screenshots/14081986/dating_app.gif"
-              title="Smart Compatibility"
-              desc="Get Compatibility based on interests, values & emotional intelligence."
+              icon={<Search className="w-6 h-6 text-pink-500" />}
+              title="Advanced Matching"
+              desc="Our AI connects you with people who match your personality and values."
             />
             <FeatureCard
-              img="https://cdn-icons-gif.flaticon.com/14112/14112996.gif"
-              title="Private Chat"
-              desc="Safe and fun chat with your Compatibility."
+              icon={<ShieldCheck className="w-6 h-6 text-green-500" />}
+              title="Secure & Private"
+              desc="End-to-end encrypted chats and profile verification for safer connections."
             />
             <FeatureCard
-              img="https://www.actualidadiphone.com/wp-content/uploads/2018/07/App-store.gif"
-              title="Explore Freely"
-              desc="Break the ice of hesitation and explore what's around you."
+              icon={<Users className="w-6 h-6 text-blue-500" />}
+              title="Thriving Community"
+              desc="An active community increases your chances of finding a meaningful match."
             />
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-16 text-center relative px-4 z-20">
-        <h2 className="text-3xl font-bold text-pink-700 mb-10">How It Works</h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            { step: "1", title: "Create Your Profile", desc: "Tell us about yourself." },
-            { step: "2", title: "Set Preferences", desc: "Answer compatibility questions to help us match you better." },
-            { step: "3", title: "Start Connecting", desc: "View profiles, compatibilities, & chat!" }
-          ].map(({ step, title, desc }, i) => (
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.6, delay: i * 0.2 }}
-              className="p-6 bg-black/40 backdrop-blur-md rounded-2xl shadow-lg hover:scale-105 hover:shadow-2xl transition text-white"
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.5, delay: i * 0.2 }}
-                className="text-4xl font-bold text-rose-400 mb-4"
-              >
-                {step}
-              </motion.div>
-              <h3 className="text-xl font-semibold text-pink-300">{title}</h3>
-              <p className="mt-2 text-gray-200 text-sm">{desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* FAQs */}
-      <section className="py-16 relative z-20">
-        <div className="absolute inset-0 z-0" />
-        <div className="relative z-10">
-          <h2 className="text-3xl font-bold text-center text-white mb-10">FAQs</h2>
-          <div className="max-w-4xl mx-auto space-y-6 px-6 text-white">
-            {[
-              { q: "Is Amora free?", a: "Yes! You can start for free and explore premium features later." },
-              { q: "How are compatibilities calculated?", a: "We use your preferences, answers, and behavior to suggest best matches." },
-              { q: "Is my data safe?", a: "Absolutely. We use end-to-end encryption and strict privacy policies." }
-            ].map(({ q, a }) => (
-              <div key={q} className="p-4 bg-black/60 backdrop-blur-md rounded-xl shadow-md">
-                <h3 className="font-semibold text-pink-400">{q}</h3>
-                <p className="text-gray-200">{a}</p>
-              </div>
-            ))}
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-16 bg-white/60">
+        <div className="container text-center">
+          <h2 className="text-3xl font-bold mb-8">How It Works</h2>
+          <div className="flex flex-col md:flex-row justify-center items-center gap-8 md:gap-12">
+            <Step
+              number="1"
+              title="Create Profile"
+              desc="Sign up and build your personality-first profile."
+            />
+            <ArrowRight
+              className="text-gray-300 rotate-90 md:rotate-0"
+              size={28}
+            />
+            <Step
+              number="2"
+              title="Find Matches"
+              desc="Browse or let our AI recommend compatible people."
+            />
+            <ArrowRight
+              className="text-gray-300 rotate-90 md:rotate-0"
+              size={28}
+            />
+            <Step
+              number="3"
+              title="Start Connecting"
+              desc="Message, meet, and build something real."
+            />
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="w-full text-center py-16 relative z-20 text-white">
-        <h2 className="text-3xl font-bold">Ready to Find Your Vibe?</h2>
-        <a
-          href="/signup"
-          className="mt-6 inline-block bg-white text-pink-600 hover:scale-110 transition px-6 py-3 rounded-full font-semibold shadow-lg"
-        >
-          Join Now 💞
-        </a>
+      {/* Testimonials Section */}
+      <section id="testimonials" className="py-16">
+        <div className="container">
+          <h2 className="text-3xl font-bold text-center mb-8">
+            Loved by our community
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <TestimonialCard
+              quote="I found the love of my life here — the matching system is thoughtful and accurate."
+              author="Jessica L."
+              avatar="https://randomuser.me/api/portraits/women/44.jpg"
+            />
+            <TestimonialCard
+              quote="No more meaningless swipes. This app focuses on personality and values."
+              author="Mark T."
+              avatar="https://randomuser.me/api/portraits/men/32.jpg"
+            />
+            <TestimonialCard
+              quote="I met someone special in a month. The community feels genuine."
+              author="Sarah P."
+              avatar="https://randomuser.me/api/portraits/women/65.jpg"
+            />
+          </div>
+        </div>
       </section>
 
-      {/* Custom styles */}
-      <style>{`
-        @keyframes floatHearts {
-          0% { background-position: 0 0; }
-          100% { background-position: 0 -1000px; }
-        }
-        .animate-floating-hearts {
-          animation: floatHearts 60s linear infinite;
-        }
-        @keyframes fadeInUp {
-          0% { opacity: 0; transform: translateY(20px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up { animation: fadeInUp 1s ease-out both; }
-        .delay-200 { animation-delay: 0.2s; }
-        .delay-400 { animation-delay: 0.4s; }
-      `}</style>
-    </main>
+      {/* Footer */}
+      <footer className="py-10 mt-10">
+        <div className="container text-center muted">
+          <p>
+            &copy; {new Date().getFullYear()} SoulSync. All rights reserved.
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 }
 
-// Reusable Feature Card
-function FeatureCard({ img, title, desc }) {
+/* ---------------- Reusable Components ---------------- */
+
+function FeatureCard({ icon, title, desc }) {
   return (
-    <div className="bg-black/40 backdrop-blur-md p-4 rounded-xl shadow-md transition transform hover:-translate-y-2 duration-300 text-white max-w-xs mx-auto">
-      <img src={img} className="w-28 h-28 object-cover rounded-lg mb-3 mx-auto" alt={title} />
-      <h3 className="text-lg font-semibold text-pink-400">{title}</h3>
-      <p className="text-sm text-gray-200">{desc}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.45 }}
+      className="feature-card p-6 text-center"
+    >
+      <div className="feature-icon mx-auto mb-4">{icon}</div>
+      <h3 className="text-xl font-semibold mb-2">{title}</h3>
+      <p className="muted small">{desc}</p>
+    </motion.div>
+  );
+}
+
+function Step({ number, title, desc }) {
+  return (
+    <div className="max-w-xs">
+      <div className="step-bubble mb-4 mx-auto">{number}</div>
+      <h3 className="text-xl font-bold mb-2">{title}</h3>
+      <p className="muted small">{desc}</p>
     </div>
+  );
+}
+
+function TestimonialCard({ quote, author, avatar }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.45 }}
+      className="testimonial-card p-6"
+    >
+      <div className="flex items-center mb-3">
+        <img src={avatar} alt={author} className="t-avatar mr-3" />
+        <div>
+          <div className="font-bold">{author}</div>
+          <div className="flex text-yellow-400">
+            <Star size={14} fill="currentColor" />
+            <Star size={14} fill="currentColor" />
+            <Star size={14} fill="currentColor" />
+            <Star size={14} fill="currentColor" />
+            <Star size={14} fill="currentColor" />
+          </div>
+        </div>
+      </div>
+      <p className="muted small italic">"{quote}"</p>
+    </motion.div>
   );
 }

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
