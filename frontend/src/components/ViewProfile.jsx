@@ -217,6 +217,7 @@ export default function ViewProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [userEmail, setUserEmail] = useState(null); // <-- email from User model
   const [report, setReport] = useState(null);
   const [myReport, setMyReport] = useState(null);
   const [compat, setCompat] = useState(location.state?.compatibility ?? null);
@@ -248,7 +249,8 @@ export default function ViewProfile() {
           /* ignore */
         }
 
-        const [pRes, rRes, myRes] = await Promise.allSettled([
+        // fetch profile, personality, my-report, and user (for email)
+        const [pRes, rRes, myRes, userRes] = await Promise.allSettled([
           axios.get(`${base}/api/profile/user/${userId}`, {
             withCredentials: true,
           }),
@@ -258,6 +260,32 @@ export default function ViewProfile() {
           axios.get(`${base}/api/personality/my-report`, {
             withCredentials: true,
           }),
+          // ----- Fetch User model for this user (email) -----
+          // Try direct per-user endpoint, otherwise fallback to all-users
+          (async () => {
+            try {
+              return await axios.get(`${base}/api/auth/user/${userId}`, {
+                withCredentials: true,
+              });
+            } catch (err) {
+              // Fallback to all-users
+              try {
+                const all = await axios.get(`${base}/api/auth/all-users`, {
+                  withCredentials: true,
+                });
+                const users = Array.isArray(all.data)
+                  ? all.data
+                  : all.data.users || all.data?.data || [];
+                const found = users.find(
+                  (u) =>
+                    u._id === userId || u.id === userId || u._id === userId + ""
+                );
+                return { data: { user: found } };
+              } catch (err2) {
+                throw err2;
+              }
+            }
+          })(),
         ]);
 
         if (pRes.status === "fulfilled") setProfile(pRes.value.data);
@@ -270,6 +298,35 @@ export default function ViewProfile() {
           setReport(rRes.value.data.report || rRes.value.data);
         if (myRes.status === "fulfilled")
           setMyReport(myRes.value.data.report || myRes.value.data);
+
+        // handle userRes for email (safe access for different response shapes)
+        if (userRes && userRes.status === "fulfilled") {
+          const data = userRes.value.data || {};
+          const email =
+            data.user?.email || data.email || data.user?.data?.email || null;
+          if (email) setUserEmail(email);
+          else {
+            // try to find email in other shapes
+            if (data?.user === undefined && typeof data === "object") {
+              if (data.email) setUserEmail(data.email);
+              else if (
+                data.user &&
+                data.user._id &&
+                data.user._id === userId &&
+                data.user.email
+              ) {
+                setUserEmail(data.user.email);
+              }
+            } else if (
+              data.user &&
+              data.user._id &&
+              data.user._id === userId &&
+              data.user.email
+            ) {
+              setUserEmail(data.user.email);
+            }
+          }
+        }
 
         if (typeof compat !== "number" && myId) {
           try {
@@ -438,37 +495,6 @@ export default function ViewProfile() {
               }
             ></div>
 
-            {/* camera icon to update cover */}
-            {/* <div className="absolute right-6 top-4">
-              <label className="bg-white p-2 rounded-full shadow cursor-pointer">
-                <Camera />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      setSaving(true);
-                      // fallback: send as morePics (if your backend doesn't have cover route)
-                      await uploadProfileUpdate({
-                        formFields: {},
-                        profileFile: null,
-                        moreFiles: [file],
-                      });
-                      window.location.reload();
-                    } catch (err) {
-                      console.error(err);
-                      alert("Cover upload failed.");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                  className="hidden"
-                />
-              </label>
-            </div> */}
-
             {/* content area overlapping the cover */}
             <div className="p-6">
               <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 items-stretch">
@@ -523,6 +549,11 @@ export default function ViewProfile() {
                     >
                       {profile.age ? `${profile.age} years` : null}
                     </div>
+
+                    {/* --- EMAIL (from User model) --- */}
+                    <h2 className="text-xl font-extrabold mb-1 text-center">
+                      {userEmail || profile.email || "—"}
+                    </h2>
 
                     {profile.location && (
                       <div
@@ -716,7 +747,9 @@ export default function ViewProfile() {
                   {report ? (
                     <div className="space-y-4 h-full flex flex-col">
                       <div>
-                        <h4 className="font-semibold text-[19px] mb-2">Core Narrative</h4>
+                        <h4 className="font-semibold text-[19px] mb-2">
+                          Core Narrative
+                        </h4>
                         <p className="text-muted text-sm text-[15px]">
                           {report?.detailedReport?.summary?.description ||
                             report?.personalityNarrative ||
