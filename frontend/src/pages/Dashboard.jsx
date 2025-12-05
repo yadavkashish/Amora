@@ -10,16 +10,33 @@ import {
   TrendingUp,
   Users,
   Sparkles,
-  Filter,
   MapPin,
   Star,
   School,
   Zap,
-  CheckCircle,
+  Loader2,
+  Search
 } from "lucide-react";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = `${BASE_URL}` || "http://localhost:5000";
+
+// --- THEME BACKGROUND (Shared) ---
+const BackgroundGrid = () => (
+  <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-[#05030a]">
+    <div
+      className="absolute inset-0"
+      style={{
+        backgroundImage: `
+          radial-gradient(circle at 10% 0%, rgba(244, 63, 94, 0.15), transparent 50%),
+          radial-gradient(circle at 90% 100%, rgba(168, 85, 247, 0.15), transparent 50%),
+          radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.1), transparent 50%)
+        `,
+      }}
+    />
+    <div className="absolute inset-0 opacity-[0.2] mix-blend-soft-light bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+  </div>
+);
 
 // ============================================================================
 // HELPER: Normalize gender
@@ -34,27 +51,28 @@ function normalizeGender(g) {
 }
 
 // ============================================================================
-// LOADING SKELETON
+// LOADING SKELETON (Dark Mode)
 // ============================================================================
 function LoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-purple-50 to-indigo-50 pt-24 px-4 pb-12">
+    <div className="min-h-screen bg-[#05030a] pt-24 px-4 pb-12 relative overflow-hidden">
+      <BackgroundGrid />
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <div className="h-14 w-80 mx-auto mb-4 rounded-2xl bg-gray-200 animate-pulse"></div>
-          <div className="h-8 w-96 mx-auto mb-6 rounded-xl bg-gray-200 animate-pulse"></div>
+          <div className="h-12 w-64 mx-auto mb-4 rounded-xl bg-white/10 animate-pulse"></div>
+          <div className="h-6 w-96 mx-auto mb-6 rounded-lg bg-white/5 animate-pulse"></div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
             <div
               key={i}
-              className="bg-white rounded-3xl shadow-lg overflow-hidden"
+              className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden h-[450px]"
             >
-              <div className="h-80 bg-gray-200 animate-pulse"></div>
+              <div className="h-64 bg-white/10 animate-pulse"></div>
               <div className="p-6 space-y-3">
-                <div className="h-6 w-3/4 rounded-lg bg-gray-200 animate-pulse"></div>
-                <div className="h-4 w-full rounded-lg bg-gray-200 animate-pulse"></div>
-                <div className="h-10 rounded-xl bg-gray-200 animate-pulse"></div>
+                <div className="h-6 w-3/4 rounded-lg bg-white/10 animate-pulse"></div>
+                <div className="h-4 w-full rounded-lg bg-white/5 animate-pulse"></div>
+                <div className="h-10 rounded-xl bg-white/5 animate-pulse mt-4"></div>
               </div>
             </div>
           ))}
@@ -69,51 +87,47 @@ function LoadingSkeleton() {
 // ============================================================================
 function ErrorState({ error, onRetry }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="min-h-screen bg-gradient-to-br from-rose-50 via-purple-50 to-indigo-50 pt-24 px-4 flex items-center justify-center"
-    >
-      <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md text-center border-2 border-red-200">
-        <motion.div
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="mb-6"
-        >
-          <AlertCircle className="w-20 h-20 text-red-500 mx-auto" />
-        </motion.div>
-        <h2 className="text-3xl font-black text-gray-900 mb-4">Oops!</h2>
-        <p className="text-gray-600 mb-8">{error}</p>
+    <div className="min-h-screen bg-[#05030a] pt-24 px-4 flex items-center justify-center relative">
+      <BackgroundGrid />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-black/50 backdrop-blur-xl rounded-3xl p-10 max-w-md text-center border border-red-500/30 shadow-2xl"
+      >
+        <div className="mb-6 inline-flex p-4 rounded-full bg-red-500/10 border border-red-500/20">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Connection Issue</h2>
+        <p className="text-zinc-400 mb-8">{error}</p>
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onRetry}
-          className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-red-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all"
+          className="w-full px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-red-500/25 transition-all"
         >
           <span className="flex items-center justify-center gap-2">
-            <Zap className="w-5 h-5" />
-            Try Again
+            <Zap className="w-4 h-4" /> Try Again
           </span>
         </motion.button>
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }
 
 // ============================================================================
-// MATCH CARD - Beautiful light theme
+// MATCH CARD - Professional Dark Theme
 // ============================================================================
 function MatchCard({ match, idx, onViewProfile, onMessage }) {
   const [imageFailed, setImageFailed] = useState(false);
 
   const getCompatibilityColor = (score) => {
-    if (score >= 80) return "from-emerald-500 via-green-500 to-teal-500";
-    if (score >= 60) return "from-blue-500 via-cyan-500 to-sky-500";
-    return "from-orange-500 via-amber-500 to-yellow-500";
+    if (score >= 80) return "from-emerald-400 to-green-600";
+    if (score >= 60) return "from-blue-400 to-cyan-500";
+    return "from-amber-400 to-orange-500";
   };
 
   const compScore = Math.round(Number(match.compatibility) || 0);
-  const compColor = getCompatibilityColor(compScore);
+  const compGradient = getCompatibilityColor(compScore);
 
   const getDomainName = (domain) => {
     if (!domain) return "";
@@ -123,108 +137,104 @@ function MatchCard({ match, idx, onViewProfile, onMessage }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      layout
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.04, duration: 0.5 }}
-      exit={{ opacity: 0, scale: 0.8 }}
-      whileHover={{ y: -12, boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)" }}
-      className="h-full transform transition-shadow duration-500"
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ delay: idx * 0.05, duration: 0.4 }}
+      className="group h-full"
     >
-      <div className="bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden h-full flex flex-col group border border-gray-100">
-        {/* Image Section */}
-        <div className="relative h-80 bg-gradient-to-br from-gray-200 to-gray-300 overflow-hidden">
+      <div className="relative h-full bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-pink-500/30 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-pink-500/10">
+        
+        {/* Image Area */}
+        <div className="relative h-72 overflow-hidden bg-zinc-900">
           {match.profilePic && !imageFailed ? (
             <img
               src={match.profilePic}
               alt={match.name}
               onError={() => setImageFailed(true)}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-pink-400 via-purple-400 to-blue-400 flex items-center justify-center">
-              <span className="text-white text-7xl font-black opacity-70">
+            <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center">
+              <span className="text-zinc-700 text-6xl font-black opacity-50">
                 {match.name?.charAt(0) || "?"}
               </span>
             </div>
           )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#05030a] via-transparent to-transparent opacity-90" />
 
-          {/* Compatibility Badge */}
-          <div
-            className={`absolute top-4 right-4 px-5 py-2.5 rounded-2xl font-black text-white shadow-xl flex items-center gap-2 bg-gradient-to-r ${compColor}`}
-          >
-            <Flame className="w-5 h-5" />
-            <span className="text-lg">{compScore}%</span>
+          {/* Badges */}
+          <div className="absolute top-4 right-4">
+             <div className={`px-3 py-1.5 rounded-full text-xs font-bold text-black shadow-lg flex items-center gap-1.5 bg-gradient-to-r ${compGradient}`}>
+              <Flame className="w-3.5 h-3.5 fill-black/20" />
+              <span>{compScore}% Match</span>
+            </div>
           </div>
 
-          {/* Domain Badge */}
           {match.emailDomain && (
-            <div className="absolute top-4 left-4 px-4 py-2.5 rounded-2xl font-bold text-white shadow-xl flex items-center gap-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-              <School className="w-4 h-4" />
-              <span className="text-sm">
-                {getDomainName(match.emailDomain)}
-              </span>
+            <div className="absolute top-4 left-4">
+              <div className="px-3 py-1.5 rounded-full text-xs font-semibold text-white/90 bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
+                <School className="w-3.5 h-3.5 text-blue-400" />
+                <span>{getDomainName(match.emailDomain)}</span>
+              </div>
             </div>
           )}
 
-          {/* Profile Info Overlay */}
-          <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-            <h3 className="text-3xl font-black mb-1 drop-shadow-lg">
-              {match.name}, {match.age}
+          {/* Overlay Info */}
+          <div className="absolute bottom-0 left-0 right-0 p-5">
+            <h3 className="text-2xl font-bold text-white mb-1 truncate">
+              {match.name}, <span className="text-pink-500 font-light">{match.age}</span>
             </h3>
             {match.location && (
-              <div className="flex items-center gap-2 text-sm font-semibold bg-black/30 backdrop-blur-sm rounded-full px-3 py-1 inline-flex">
-                <MapPin className="w-4 h-4" />
+              <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
+                <MapPin className="w-3.5 h-3.5" />
                 {match.location}
               </div>
             )}
           </div>
         </div>
 
-        {/* Info Section */}
-        <div className="p-6 flex-grow flex flex-col">
-          {/* Bio */}
-          <p className="text-gray-700 text-sm line-clamp-2 mb-4 flex-grow leading-relaxed font-medium italic">
-            {match.bio || "No bio provided yet..."}
+        {/* Content Area */}
+        <div className="p-5 flex-grow flex flex-col">
+          <p className="text-zinc-400 text-sm line-clamp-2 mb-4 leading-relaxed font-light flex-grow">
+            "{match.bio || "Just joined the community..."}"
           </p>
 
           {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-5 border-t border-gray-100 pt-4">
+          <div className="flex flex-wrap gap-2 mb-6">
             {match.gender && (
-              <span className="px-4 py-1.5 bg-gradient-to-r from-pink-100 to-rose-50 text-pink-700 rounded-full text-xs font-bold border-2 border-pink-200 flex items-center gap-1">
-                <Users className="w-3 h-3" />
+              <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
                 {match.gender}
               </span>
             )}
-            {match.interests && match.interests.length > 0 && (
-              <span className="px-4 py-1.5 bg-gradient-to-r from-blue-100 to-purple-50 text-blue-700 rounded-full text-xs font-bold border-2 border-blue-200 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
+            {match.interests?.length > 0 && (
+              <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider font-semibold text-zinc-400 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-purple-400" />
                 {match.interests.length} Interests
               </span>
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
+          {/* Buttons */}
+          <div className="grid grid-cols-2 gap-3 mt-auto">
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => onViewProfile(match)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black rounded-2xl shadow-lg hover:shadow-xl transition-all"
+              className="py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white text-sm font-semibold shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 transition-all flex items-center justify-center gap-2"
             >
-              <Heart className="w-5 h-5 fill-white" />
-              <span>View</span>
+              <Heart className="w-4 h-4" /> Profile
             </motion.button>
 
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => onMessage(match)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-gray-100 text-gray-700 font-black rounded-2xl shadow-md hover:bg-gray-200 transition-all border border-gray-200"
+              className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-semibold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
             >
-              <MessageCircle className="w-5 h-5 text-blue-500" />
-              <span>Chat</span>
+              <MessageCircle className="w-4 h-4 text-blue-400" /> Chat
             </motion.button>
           </div>
         </div>
@@ -238,7 +248,6 @@ function MatchCard({ match, idx, onViewProfile, onMessage }) {
 // ============================================================================
 export default function DashboardModern() {
   const [me, setMe] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
   const [matches, setMatches] = useState([]);
   const [filteredMatches, setFilteredMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -246,8 +255,6 @@ export default function DashboardModern() {
   const [filter, setFilter] = useState("all");
   const navigate = useNavigate();
   const abortRef = useRef(null);
-
- 
 
   // ===== FETCH DATA =====
   useEffect(() => {
@@ -259,32 +266,13 @@ export default function DashboardModern() {
         setLoading(true);
         setError(null);
 
-        const meRes = await axios.get(`${API_URL}/api/auth/me`, {
-          withCredentials: true,
-          signal,
-        });
+        const meRes = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true, signal });
         setMe(meRes.data.user || null);
 
-        const profileRes = await axios.get(`${API_URL}/api/profile/latest`, {
-          withCredentials: true,
-          signal,
-        });
-        setMyProfile(profileRes.data || null);
-
-        const matchesRes = await axios.get(
-          `${API_URL}/api/compatibility/all-matches`,
-          {
-            withCredentials: true,
-            signal,
-          }
-        );
+        const matchesRes = await axios.get(`${API_URL}/api/compatibility/all-matches`, { withCredentials: true, signal });
 
         const payload = matchesRes.data;
-        const rawMatches = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.matches)
-          ? payload.matches
-          : payload?.data || [];
+        const rawMatches = Array.isArray(payload) ? payload : Array.isArray(payload?.matches) ? payload.matches : payload?.data || [];
 
         const normalized = rawMatches.map((m) => ({
           ...m,
@@ -298,21 +286,16 @@ export default function DashboardModern() {
       } catch (err) {
         if (axios.isCancel?.(err) || err.name === "CanceledError") return;
         console.error("❌ Error fetching data:", err);
-        setError(
-          err.response?.data?.error || err.message || "Failed to load matches"
-        );
+        setError(err.response?.data?.error || err.message || "Failed to load matches");
         setLoading(false);
       }
     };
 
     fetchData();
-
-    return () => {
-      if (abortRef.current) abortRef.current.abort();
-    };
+    return () => { if (abortRef.current) abortRef.current.abort(); };
   }, []);
 
-  // ===== APPLY FILTERS (Domain + Gender + Compatibility) =====
+  // ===== APPLY FILTERS =====
   useEffect(() => {
     if (!Array.isArray(matches) || !me) {
       setFilteredMatches([]);
@@ -321,43 +304,30 @@ export default function DashboardModern() {
 
     let result = [...matches];
 
-    // ✅ DOMAIN FILTERING (PRIMARY) - Only same email domain
-    const userDomain = me.emailDomain;
-    if (userDomain) {
-      result = result.filter((m) => m.emailDomain === userDomain);
+    // Domain Filter (Strict)
+    if (me.emailDomain) {
+      result = result.filter((m) => m.emailDomain === me.emailDomain);
     }
 
-    // 🔥 OPPOSITE GENDER FILTERING (SECONDARY)
+    // Gender Filter
     const userGender = normalizeGender(me.gender);
     if (userGender) {
       result = result.filter((m) => {
         const matchGender = normalizeGender(m.gender);
         if (!matchGender) return false;
-
         if (userGender === "male" && matchGender === "female") return true;
         if (userGender === "female" && matchGender === "male") return true;
         if (userGender === "other" && matchGender !== "other") return true;
-
         return false;
       });
     }
 
-    // Secondary compatibility filtering
+    // Compatibility Filter
     switch (filter) {
-      case "80+":
-        result = result.filter((m) => Number(m.compatibility) >= 80);
-        break;
-      case "60-80":
-        result = result.filter((m) => {
-          const c = Number(m.compatibility);
-          return c >= 60 && c < 80;
-        });
-        break;
-      case "below60":
-        result = result.filter((m) => Number(m.compatibility) < 60);
-        break;
-      default:
-        break;
+      case "80+": result = result.filter((m) => Number(m.compatibility) >= 80); break;
+      case "60-80": result = result.filter((m) => { const c = Number(m.compatibility); return c >= 60 && c < 80; }); break;
+      case "below60": result = result.filter((m) => Number(m.compatibility) < 60); break;
+      default: break;
     }
 
     setFilteredMatches(result);
@@ -365,55 +335,28 @@ export default function DashboardModern() {
 
   // ===== HANDLERS =====
   const handleViewProfile = (match) => {
-    console.log("📍 Navigating to profile:", match.userId);
     navigate(`/view-profile/${match.userId}`, {
-      state: {
-        compatibility: Math.round(Number(match.compatibility) || 0),
-        matchName: match.name,
-        matchGender: match.gender,
-      },
+      state: { compatibility: Math.round(Number(match.compatibility) || 0), matchName: match.name, matchGender: match.gender },
     });
   };
 
   const handleSendMessage = (match) => {
-    console.log("💬 Opening chat with:", match.userId);
     navigate(`/chat/${match.userId}`, { state: { matchName: match.name } });
   };
 
   // ===== STATS =====
   const stats = {
-    perfect: filteredMatches.filter((m) => Number(m.compatibility) >= 80)
-      .length,
-    great: filteredMatches.filter((m) => {
-      const c = Number(m.compatibility);
-      return c >= 60 && c < 80;
-    }).length,
-    average:
-      filteredMatches.length > 0
-        ? Math.round(
-            filteredMatches.reduce(
-              (s, m) => s + Number(m.compatibility || 0),
-              0
-            ) / filteredMatches.length
-          )
-        : 0,
+    perfect: filteredMatches.filter((m) => Number(m.compatibility) >= 80).length,
+    great: filteredMatches.filter((m) => { const c = Number(m.compatibility); return c >= 60 && c < 80; }).length,
+    average: filteredMatches.length > 0 ? Math.round(filteredMatches.reduce((s, m) => s + Number(m.compatibility || 0), 0) / filteredMatches.length) : 0,
     total: filteredMatches.length,
   };
 
   // ===== RENDER =====
   if (loading) return <LoadingSkeleton />;
-  if (error)
-    return (
-      <ErrorState error={error} onRetry={() => window.location.reload()} />
-    );
+  if (error) return <ErrorState error={error} onRetry={() => window.location.reload()} />;
 
-  const oppositeGender =
-    normalizeGender(me?.gender) === "male"
-      ? "Female"
-      : normalizeGender(me?.gender) === "female"
-      ? "Male"
-      : "Other";
-
+  const oppositeGender = normalizeGender(me?.gender) === "male" ? "Female" : normalizeGender(me?.gender) === "female" ? "Male" : "Other";
   const getDomainDisplay = (domain) => {
     if (!domain) return "";
     const name = domain.replace("@", "").split(".")[0];
@@ -421,167 +364,85 @@ export default function DashboardModern() {
   };
 
   return (
-    <motion.section
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-br from-rose-50 via-purple-50 to-indigo-50 py-12 px-4 pt-24 relative overflow-hidden"
-    >
-      {/* Subtle animated background blurs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-40 -right-40 w-80 h-80 bg-pink-300 rounded-full blur-3xl opacity-20"
-        />
-        <motion.div
-          animate={{ scale: [1.2, 1, 1.2], rotate: [360, 180, 0] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-300 rounded-full blur-3xl opacity-20"
-        />
-      </div>
+    <div className="min-h-screen bg-[#05030a] text-slate-200 font-sans pb-20 relative overflow-hidden">
+      <BackgroundGrid />
 
-      <div className="max-w-7xl mx-auto relative z-10">
-        {/* --- Header --- */}
-        <motion.div
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-10"
-        >
-          <motion.h1
-  initial={{ opacity: 0, y: 18 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.7 }}
-  className="text-4xl md:text-6xl font-extrabold mb-5"
-  style={{ lineHeight: 1.02 }}
->
-  Find Your{" "}
-  <span
-    style={{
-      background: "linear-gradient(90deg, #FF3CAC, #9B4DFF, #3A7BFF)",
-      WebkitBackgroundClip: "text",
-      WebkitTextFillColor: "transparent",
-      display: "inline-block",
-      fontWeight: 900,
-    }}
-  >
-    Perfect Match
-  </span>
-</motion.h1>
+      {/* --- Header Section --- */}
+      <section className="relative pt-24 pb-12 px-6">
+        <div className="max-w-7xl mx-auto text-center z-10 relative">
+          
+          {/* User Pill */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-pink-500/20 bg-pink-500/10 backdrop-blur-sm mb-6"
+          >
+            <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
+            <span className="text-xs font-bold text-pink-300 tracking-wider uppercase">Welcome back, {me?.name}</span>
+          </motion.div>
 
+          <motion.h1 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6"
+          >
+            Your Campus <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400">
+              Connections.
+            </span>
+          </motion.h1>
 
-
-
-          <p className="text-xl text-gray-600 mb-6 font-semibold flex items-center justify-center gap-2 flex-wrap">
-            <Sparkles className="w-5 h-5 text-pink-500" />
-            <span>Discover meaningful connections from your campus</span>
-            <Sparkles className="w-5 h-5 text-purple-500" />
-          </p>
-
-          <div className="inline-block px-4">
-            <div className="px-8 py-4 bg-white rounded-3xl shadow-xl border-2 border-pink-100">
-              <p className="text-base text-gray-700 font-semibold">
-                <span className="mr-2">👋</span>
-                Welcome,{" "}
-                <span className="font-black text-transparent bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text">
-                  {me?.name}
-                </span>
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* --- Filter Buttons --- */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="flex flex-wrap gap-4 justify-center mb-10 px-4"
-        >
-          {[
-            { label: "All Matches", value: "all", icon: "🎯" },
-            { label: "Perfect", value: "80+", icon: "🔥" },
-            { label: "Great", value: "60-80", icon: "💚" },
-            { label: "Explore", value: "below60", icon: "👍" },
-          ].map((btn, idx) => (
-            <motion.button
-              key={btn.value}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setFilter(btn.value)}
-              className={`px-7 py-3 rounded-full font-bold transition-all flex items-center gap-2 text-base ${
-                filter === btn.value
-                  ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-xl shadow-purple-500/30"
-                  : "bg-white text-gray-700 hover:bg-gray-100 shadow-md border border-gray-200"
-              }`}
-            >
-              <span>{btn.icon}</span>
-              <span>{btn.label}</span>
-              {btn.value !== "all" && (
-                <span
-                  className={`ml-2 px-3 py-1 rounded-full text-xs font-bold ${
-                    filter === btn.value ? "bg-white/30" : "bg-gray-100"
-                  }`}
-                >
-                  {
-                    filteredMatches.filter((m) =>
-                      btn.value === "80+"
-                        ? m.compatibility >= 80
-                        : btn.value === "60-80"
-                        ? m.compatibility >= 60 && m.compatibility < 80
-                        : m.compatibility < 60
-                    ).length
-                  }
-                </span>
-              )}
-            </motion.button>
-          ))}
-        </motion.div>
-
-        {/* --- Filter Status Banner --- */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white border-2 border-indigo-300 rounded-2xl p-6 mb-12 max-w-4xl mx-auto shadow-lg"
-        >
-          <div className="flex items-start gap-4">
-            <Filter className="w-6 h-6 text-indigo-600 flex-shrink-0 mt-1" />
-            <div>
-              <p className="text-indigo-900 text-lg font-bold mb-2">
-                🎓 Campus Filtering Active
-              </p>
-              <div className="space-y-1 text-sm text-indigo-800">
-                <p>
-                  <CheckCircle className="w-4 h-4 inline mr-2 text-green-600" />
-                  Showing only{" "}
-                  <span className="font-bold">{oppositeGender}</span> profiles
-                  based on your gender preference.
-                </p>
-                <p>
-                  <CheckCircle className="w-4 h-4 inline mr-2 text-green-600" />
-                  Profiles restricted to{" "}
-                  <span className="font-bold">
-                    {getDomainDisplay(me?.emailDomain)} College
-                  </span>{" "}
-                  ({me?.emailDomain}).
-                </p>
-                <p className="text-xs text-indigo-700 mt-2">
-                  💡 This ensures you find matches exclusively within your verified community!
-                </p>
-              </div>
-            </div>
-          </div>
-        </motion.div> */}
-
-        {/* --- Matches Grid --- */}
-        {filteredMatches.length > 0 ? (
-          <motion.div
+          <motion.p 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-16"
+            transition={{ delay: 0.2 }}
+            className="text-zinc-400 text-lg max-w-2xl mx-auto mb-10 font-light"
           >
-            <AnimatePresence>
+            Discover {oppositeGender.toLowerCase()} students from <span className="text-white font-semibold">{getDomainDisplay(me?.emailDomain)}</span> who match your vibe.
+          </motion.p>
+
+          {/* Filters */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex flex-wrap justify-center gap-3"
+          >
+            {[
+              { label: "All Matches", value: "all", icon: Search },
+              { label: "High Match (80%+)", value: "80+", icon: Flame, color: "text-emerald-400" },
+              { label: "Great Match (60-80%)", value: "60-80", icon: Sparkles, color: "text-blue-400" },
+              { label: "Exploratory", value: "below60", icon: Users, color: "text-amber-400" },
+            ].map((btn) => (
+              <button
+                key={btn.value}
+                onClick={() => setFilter(btn.value)}
+                className={`
+                  relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border
+                  ${filter === btn.value 
+                    ? "bg-white/10 border-pink-500/50 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]" 
+                    : "bg-black/20 border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20"
+                  }
+                `}
+              >
+                <btn.icon className={`w-4 h-4 ${filter === btn.value ? btn.color || 'text-pink-400' : ''}`} />
+                {btn.label}
+              </button>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* --- Main Content Grid --- */}
+      <div className="max-w-7xl mx-auto px-6">
+        
+        {/* Matches Grid */}
+        <AnimatePresence mode="wait">
+          {filteredMatches.length > 0 ? (
+            <motion.div 
+              key="grid"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-20"
+            >
               {filteredMatches.map((match, idx) => (
                 <MatchCard
                   key={match.userId}
@@ -591,129 +452,68 @@ export default function DashboardModern() {
                   onMessage={handleSendMessage}
                 />
               ))}
-            </AnimatePresence>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-24 bg-white rounded-3xl shadow-xl border-2 border-gray-100"
-          >
-            <div className="text-6xl mb-6">🔍</div>
-            <h3 className="text-3xl font-bold text-gray-800 mb-4">
-              No Matches Found
-            </h3>
-            <p className="text-gray-600 mb-8 max-w-lg mx-auto">
-              No {oppositeGender.toLowerCase()} profiles available from{" "}
-              <span className="font-bold">
-                {getDomainDisplay(me?.emailDomain)}
-              </span>{" "}
-              with the current filter settings.
-            </p>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setFilter("all")}
-              className="px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all text-lg"
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="py-20 text-center bg-black/30 border border-white/5 rounded-3xl"
             >
-              View All Matches
-            </motion.button>
-          </motion.div>
-        )}
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="w-8 h-8 text-zinc-600" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">No matches found</h3>
+              <p className="text-zinc-500 max-w-md mx-auto mb-6">
+                Try adjusting your filters or wait for more students from {getDomainDisplay(me?.emailDomain)} to join.
+              </p>
+              <button 
+                onClick={() => setFilter("all")}
+                className="text-pink-400 text-sm hover:text-pink-300 font-medium underline underline-offset-4"
+              >
+                Reset Filters
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* --- Stats Section --- */}
+        {/* --- Stats HUD --- */}
         {filteredMatches.length > 0 && (
-          <motion.div
+          <motion.div 
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="bg-white rounded-3xl shadow-2xl p-10 border border-gray-100"
+            className="border-t border-white/10 pt-10"
           >
-            <h3 className="text-4xl font-black text-gray-900 mb-10 flex items-center gap-4 tracking-tight">
-              <TrendingUp className="w-10 h-10 text-pink-600" />
-              Your Compatibility Scoreboard
-            </h3>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              {/* Perfect Matches */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-6 border-2 border-green-200 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <Flame className="w-9 h-9 text-green-600" />
-                  <span className="text-xs font-bold text-green-700 bg-white px-3 py-1 rounded-full">
-                    PERFECT
-                  </span>
-                </div>
-                <div className="text-6xl font-black text-green-600 mb-2">
-                  {stats.perfect}
-                </div>
-                <p className="text-sm text-green-700 font-semibold">
-                  80%+ Matches
-                </p>
-              </div>
-
-              {/* Great Matches */}
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-100 rounded-2xl p-6 border-2 border-blue-200 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <Sparkles className="w-9 h-9 text-blue-600" />
-                  <span className="text-xs font-bold text-blue-700 bg-white px-3 py-1 rounded-full">
-                    GREAT
-                  </span>
-                </div>
-                <div className="text-6xl font-black text-blue-600 mb-2">
-                  {stats.great}
-                </div>
-                <p className="text-sm text-blue-700 font-semibold">
-                  60-80% Matches
-                </p>
-              </div>
-
-              {/* Average */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-100 rounded-2xl p-6 border-2 border-purple-200 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <TrendingUp className="w-9 h-9 text-purple-600" />
-                  <span className="text-xs font-bold text-purple-700 bg-white px-3 py-1 rounded-full">
-                    AVERAGE
-                  </span>
-                </div>
-                <div className="text-6xl font-black text-purple-600 mb-2">
-                  {stats.average}%
-                </div>
-                <p className="text-sm text-purple-700 font-semibold">
-                  Overall Compatibility
-                </p>
-              </div>
-
-              {/* Total */}
-              <div className="bg-gradient-to-br from-orange-50 to-yellow-100 rounded-2xl p-6 border-2 border-orange-200 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <Users className="w-9 h-9 text-orange-600" />
-                  <span className="text-xs font-bold text-orange-700 bg-white px-3 py-1 rounded-full">
-                    TOTAL
-                  </span>
-                </div>
-                <div className="text-6xl font-black text-orange-600 mb-2">
-                  {stats.total}
-                </div>
-                <p className="text-sm text-orange-700 font-semibold">
-                  From your campus
-                </p>
-              </div>
+            <div className="flex items-center gap-2 mb-6 text-zinc-400 text-sm uppercase tracking-widest font-bold">
+              <TrendingUp className="w-4 h-4 text-pink-500" /> Live Data
             </div>
 
-            {/* Tip */}
-            <div className="mt-8 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-xl">
-              <p className="text-indigo-800 text-sm font-medium flex items-start gap-2">
-                <Star className="w-5 h-5 mt-0.5 flex-shrink-0 text-indigo-600" />
-                <span>
-                  💡 <span className="font-bold">Pro Tip:</span> Update your
-                  personality assessment to increase the accuracy of these
-                  compatibility scores and attract higher quality matches!
-                </span>
-              </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Perfect Matches", value: stats.perfect, sub: "80%+ Score", color: "text-emerald-400", border: "border-emerald-500/20", bg: "bg-emerald-500/5" },
+                { label: "Great Matches", value: stats.great, sub: "60-80% Score", color: "text-blue-400", border: "border-blue-500/20", bg: "bg-blue-500/5" },
+                { label: "Avg Compatibility", value: `${stats.average}%`, sub: "Campus Average", color: "text-purple-400", border: "border-purple-500/20", bg: "bg-purple-500/5" },
+                { label: "Total Students", value: stats.total, sub: "Filtered View", color: "text-orange-400", border: "border-orange-500/20", bg: "bg-orange-500/5" },
+              ].map((stat, i) => (
+                <div key={i} className={`p-5 rounded-2xl border ${stat.border} ${stat.bg} backdrop-blur-sm`}>
+                  <p className="text-zinc-400 text-xs font-medium mb-1">{stat.label}</p>
+                  <p className={`text-3xl font-bold ${stat.color} mb-1`}>{stat.value}</p>
+                  <p className="text-white/20 text-[10px] uppercase tracking-wider">{stat.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex items-start gap-3 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+               <Star className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+               <p className="text-indigo-200 text-sm leading-relaxed">
+                 <span className="font-bold text-white">Pro Tip:</span> Refine your personality assessment to improve the accuracy of the Vibe Check algorithm. Higher accuracy means better matches.
+               </p>
             </div>
           </motion.div>
         )}
       </div>
-    </motion.section>
+    </div>
   );
 }

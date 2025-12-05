@@ -1,41 +1,69 @@
 // Signup.jsx (client)
 "use client";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Sparkles,
+  User,
+  Mail,
+  Lock,
+  ArrowRight,
+  Loader2,
+  Fingerprint,
+  Users,
+  ChevronDown, // Added for the select dropdown
+} from "lucide-react";
+
 const API_URL = import.meta.env.VITE_API_URL;
+
+// --- SHARED UI COMPONENTS ---
+
+const BackgroundGrid = () => (
+  <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-[#05030a]">
+    <div
+      className="absolute inset-0"
+      style={{
+        backgroundImage: `
+          radial-gradient(circle at 10% 0%, rgba(244, 63, 94, 0.15), transparent 50%),
+          radial-gradient(circle at 90% 100%, rgba(168, 85, 247, 0.15), transparent 50%),
+          radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.1), transparent 50%)
+        `,
+      }}
+    />
+    <div className="absolute inset-0 opacity-[0.2] mix-blend-soft-light bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+  </div>
+);
+
+// --- MAIN COMPONENT ---
 
 const Signup = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    gender: "", // <-- new
+    gender: "",
   });
-  const [step, setStep] = useState("signup"); // signup → otp
+  const [step, setStep] = useState("signup");
   const [otp, setOtp] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  // STEP 1: Request OTP
   const handleSignup = async (e) => {
     e.preventDefault();
-
-    // optional client-side check for gender
     if (!formData.gender) {
       alert("Please select your gender.");
       return;
     }
-
+    setIsLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
       });
-
       if (response.ok) {
-        alert("✅ OTP sent to your email!");
-        setStep("otp"); // move to OTP screen
+        setStep("otp");
       } else {
         const data = await response.json();
         alert("⚠️ " + (data.message || "Error sending OTP"));
@@ -43,28 +71,23 @@ const Signup = () => {
     } catch (err) {
       console.error("❌ Error sending OTP:", err);
       alert("❌ Failed to connect to server");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // STEP 2: Verify OTP & Create Account
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
-      // send entire formData (including gender) along with otp
       const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ ...formData, otp }),
       });
-
       const data = await response.json();
-
       if (response.ok) {
-        console.log("✅ Signup successful:", data);
-        // show cookies for debugging (optional)
-        console.log("🍪 Current cookies:", document.cookie.split(";").map(c => c.trim()));
-        alert(data.message || "Registered successfully");
         navigate("/compatibilityform");
       } else {
         alert("⚠️ " + (data.error || "Invalid OTP or registration error"));
@@ -72,114 +95,188 @@ const Signup = () => {
     } catch (err) {
       console.error("❌ Error verifying OTP:", err);
       alert("❌ Failed to connect to server");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden">
-      <div className="fixed top-0 left-0 w-screen h-screen z-0">
-        <iframe
-          title="SVTFOE - BFFs"
-          className="w-full h-full"
-          src="https://sketchfab.com/models/4def28f4dde644f1acb51059394430af/embed?ui_theme=dark&autostart=1&ui_controls=1&ui_infos=0&ui_watermark=0"
-          frameBorder="0"
-          allow="autoplay; fullscreen; xr-spatial-tracking"
-          style={{ pointerEvents: "auto" }}
-        />
-      </div>
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#05050a] text-slate-200 px-4">
+      <BackgroundGrid />
 
-      <div className="relative z-10 w-full h-full flex items-end justify-center px-4 pb-10">
-        {step === "signup" ? (
-          // SIGNUP FORM
-          <form
-            onSubmit={handleSignup}
-            className="backdrop-blur-md border border-gray-900/10 rounded-xl shadow-lg p-6 w-full max-w-md bg-white/70"
-          >
-            <h2 className="text-2xl font-bold text-center mb-4">Sign Up</h2>
-            <h4 className="font-medium text-center mb-4">Use your college email only</h4>
+      {/* Main Card Container - Reduced max-width and padding */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="relative z-10 w-full max-w-[400px]" // Tighter max-width
+      >
+        {/* Refined Glow Effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/15 to-purple-500/15 blur-2xl -z-10 rounded-3xl" />
 
-            <input
-              type="text"
-              placeholder="Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-2 mb-3 bg-white border border-gray-200 rounded"
-              required
-            />
-
-            <input
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full p-2 mb-3 bg-white border border-gray-200 rounded"
-              required
-            />
-
-            <input
-              type="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full p-2 mb-3 bg-white border border-gray-200 rounded"
-              required
-              minLength={6}
-            />
-
-            {/* Gender select (new) */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-              <select
-                name="gender"
-                value={formData.gender}
-                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                required
-                className="w-full p-2 bg-white border border-gray-200 rounded"
-              >
-                <option value="">Select gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
+        <div className="bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.5)]">
+          
+          {/* Header */}
+          <div className="text-center mb-7">
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 border border-white/10 mb-4 shadow-inner shadow-white/5">
+              <Sparkles className="w-5 h-5 text-pink-400" />
             </div>
+            <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">
+              {step === "signup" ? "Create Account" : "Verify Email"}
+            </h2>
+            <p className="text-zinc-400 text-sm font-light">
+              {step === "signup" 
+                ? "Join the community where chemistry matters." 
+                : `We sent a code to ${formData.email}`}
+            </p>
+          </div>
 
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              type="submit"
-              className="w-full px-4 py-2 rounded-xl text-white bg-pink-500 hover:bg-pink-600 transition font-medium"
-            >
-              Get OTP
-            </motion.button>
-          </form>
-        ) : (
-          // OTP VERIFICATION FORM
-          <form
-            onSubmit={handleVerifyOtp}
-            className="backdrop-blur-md border border-gray-900/10 rounded-xl shadow-lg p-6 w-full max-w-md bg-white/70"
-          >
-            <h2 className="text-2xl font-bold text-center mb-4">Verify OTP</h2>
+          {step === "signup" ? (
+            // --- SIGNUP FORM ---
+            <form onSubmit={handleSignup} className="space-y-3.5">
+              {/* Name Input */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
+                <div className="relative group mt-1">
+                  <User className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="John Doe"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
+                    required
+                  />
+                </div>
+              </div>
 
-            <input
-              type="text"
-              placeholder="Enter OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="w-full p-2 mb-4 bg-white border border-gray-200 rounded"
-              required
-            />
+              {/* Email Input */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">College Email</label>
+                <div className="relative group mt-1">
+                  <Mail className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+                  <input
+                    type="email"
+                    placeholder="student@university.edu"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
+                    required
+                  />
+                </div>
+                <p className="text-[10px] text-pink-300/70 ml-1 mt-1 flex items-center gap-1">
+                  <Sparkles size={9} /> Required for exclusive campus access
+                </p>
+              </div>
 
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              type="submit"
-              className="w-full px-4 py-2 rounded-xl text-white bg-pink-500 hover:bg-pink-600 transition font-medium"
-            >
-              Verify & Register
-            </motion.button>
-          </form>
-        )}
-      </div>
+              {/* Password Input */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Password</label>
+                <div className="relative group mt-1">
+                  <Lock className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              {/* Gender Input */}
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Gender</label>
+                <div className="relative group mt-1">
+                  <Users className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+                  <select
+                    value={formData.gender}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-8 text-sm text-white appearance-none focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all cursor-pointer"
+                    required
+                  >
+                    <option value="" className="bg-zinc-900 text-zinc-500">Select Identity</option>
+                    <option value="Male" className="bg-zinc-900">Male</option>
+                    <option value="Female" className="bg-zinc-900">Female</option>
+                    <option value="Other" className="bg-zinc-900">Other</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-zinc-500 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <motion.button
+                whileHover={{ scale: 1.02, boxShadow: "0 10px 20px -10px rgba(236, 72, 153, 0.5)" }}
+                whileTap={{ scale: 0.98 }}
+                disabled={isLoading}
+                className="w-full mt-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden after:absolute after:inset-0 after:bg-white/20 after:opacity-0 hover:after:opacity-100 after:transition-opacity"
+              >
+                {isLoading ? (
+                  <Loader2 className="animate-spin w-4 h-4" />
+                ) : (
+                  <>
+                    Get Started <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </motion.button>
+            </form>
+          ) : (
+            // --- OTP FORM ---
+            <form onSubmit={handleVerifyOtp} className="space-y-5">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">One-Time Password</label>
+                <div className="relative group mt-1">
+                  <Fingerprint className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="••••••"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white text-center tracking-[0.5em] font-mono placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
+                    required
+                    maxLength={6}
+                  />
+                </div>
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.02, boxShadow: "0 10px 20px -10px rgba(236, 72, 153, 0.5)" }}
+                whileTap={{ scale: 0.98 }}
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                 {isLoading ? (
+                  <Loader2 className="animate-spin w-4 h-4" />
+                ) : (
+                  <>
+                    Verify & Complete <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </motion.button>
+
+              <button 
+                type="button" 
+                onClick={() => setStep('signup')}
+                className="w-full text-xs text-zinc-500 hover:text-white transition-colors text-center"
+              >
+                Entered wrong email? Go back
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Footer Links */}
+        <div className="mt-6 text-center">
+          <p className="text-zinc-500 text-xs">
+            Already have an account?{" "}
+            <span onClick={() => navigate('/login')} className="text-pink-400 hover:text-pink-300 cursor-pointer font-medium transition-colors underline underline-offset-4">
+              Log in
+            </span>
+          </p>
+        </div>
+      </motion.div>
     </div>
   );
 };

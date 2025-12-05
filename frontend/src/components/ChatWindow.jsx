@@ -5,7 +5,7 @@ import axios from "axios";
 import { formatTime } from "../utils/time";
 import { getSocket } from "../utils/socket";
 import { 
-  FiSend, FiPhone, FiVideo, FiMoreVertical, FiTrash2, FiArrowLeft 
+  FiSend, FiPhone, FiVideo, FiMoreVertical, FiTrash2, FiArrowLeft, FiCheck 
 } from "react-icons/fi";
 
 export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
@@ -32,7 +32,7 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
 
   // ✅ Listen for "seenMessage" updates
   useEffect(() => {
-    socket.on("seenMessage", ({ userId }) => {
+    const handleSeen = ({ userId }) => {
       if (userId === selectedUser._id) {
         setMessages(prev =>
           prev.map(m =>
@@ -42,8 +42,9 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
           )
         );
       }
-    });
-    return () => socket.off("seenMessage");
+    };
+    socket.on("seenMessage", handleSeen);
+    return () => socket.off("seenMessage", handleSeen);
   }, [socket, selectedUser, currentUserId]);
 
   // ✅ Mark messages as seen when opening chat
@@ -76,12 +77,13 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
 
   // ✅ Listen for new messages in real-time
   useEffect(() => {
-    socket.on("newMessage", (msg) => {
+    const handleNewMessage = (msg) => {
       if (msg.sender === selectedUser._id || msg.receiver === selectedUser._id) {
         setMessages(prev => [...prev, msg]);
       }
-    });
-    return () => socket.off("newMessage");
+    };
+    socket.on("newMessage", handleNewMessage);
+    return () => socket.off("newMessage", handleNewMessage);
   }, [socket, selectedUser]);
 
   // ✅ Auto scroll to bottom
@@ -128,72 +130,93 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   };
 
   return (
-    <div className="flex-1 flex flex-col pt-2 h-full bg-gray-100">
-      {/* Header */}
-      <div className="px-4 py-3 border-b flex items-center justify-between bg-white shadow-sm">
-        <div className="flex items-center gap-3">
+    <div className="flex-1 flex flex-col h-full bg-transparent relative">
+      {/* --- Header --- */}
+      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-black/20 backdrop-blur-sm z-10">
+        <div className="flex items-center gap-4">
           {isMobile && onBack && (
             <button 
               onClick={onBack} 
-              className="p-1 mr-2 rounded-md hover:bg-gray-200"
+              className="p-2 -ml-2 rounded-full hover:bg-white/10 text-zinc-300 transition-colors"
             >
               <FiArrowLeft size={20} />
             </button>
           )}
-         <img
-            src={
-              selectedUser.profilePic && selectedUser.profilePic.startsWith("http")
-                ? selectedUser.profilePic
-                : "https://via.placeholder.com/80"
-            }
-            alt={selectedUser.name}
-            className="w-10 h-10 rounded-full object-cover"
-          />
-          <h2 className="text-gray-900 font-medium">{selectedUser.name}</h2>
+          
+          <div className="relative">
+            <img
+                src={
+                selectedUser.profilePic && selectedUser.profilePic.startsWith("http")
+                    ? selectedUser.profilePic
+                    : "https://via.placeholder.com/80"
+                }
+                alt={selectedUser.name}
+                className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-md"
+            />
+            {/* Online indicator placeholder */}
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full"></div>
+          </div>
+          
+          <div>
+            <h2 className="text-white font-bold text-lg leading-tight">{selectedUser.name}</h2>
+            <p className="text-zinc-500 text-xs">Online</p>
+          </div>
         </div>
 
-        <div className="flex gap-3 text-gray-600">
-          <FiPhone className="cursor-pointer hover:text-pink-500" />
-          <FiVideo className="cursor-pointer hover:text-pink-500" />
-          <FiMoreVertical className="cursor-pointer hover:text-pink-500" />
+        <div className="flex gap-4 text-zinc-400">
+          <FiPhone className="cursor-pointer hover:text-pink-400 transition-colors w-5 h-5" />
+          <FiVideo className="cursor-pointer hover:text-pink-400 transition-colors w-5 h-5" />
+          <FiMoreVertical className="cursor-pointer hover:text-pink-400 transition-colors w-5 h-5" />
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map(msg => {
+      {/* --- Messages Area --- */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        {messages.map((msg, index) => {
           const senderId = msg.sender?.toString() || msg.sender;
           const isSender = senderId === currentUserId?.toString();
+          const isLastMessage = index === messages.length - 1;
 
           return (
-            <div key={msg._id} className={`flex ${isSender ? "justify-end" : "justify-start"}`}>
-              <div className={`group relative px-4 py-2 rounded-2xl max-w-xs shadow-md
+            <div 
+              key={msg._id || index} 
+              className={`flex w-full ${isSender ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`group relative px-5 py-3 rounded-2xl max-w-[85%] md:max-w-[70%] shadow-lg break-words text-sm md:text-base transition-all
                 ${isSender 
-                  ? "bg-gradient-to-r from-pink-500 to-pink-400 text-white"
-                  : "bg-white text-gray-900 border"
+                  ? "bg-gradient-to-br from-pink-600 to-purple-700 text-white rounded-tr-none"
+                  : "bg-white/5 border border-white/10 text-slate-200 rounded-tl-none hover:bg-white/10"
                 }`}
               >
-                <p>{msg.content}</p>
+                <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
 
-                {/* Timestamp + Seen */}
-                <div className="flex justify-end items-center gap-1 mt-1 text-[10px] opacity-80">
+                {/* Meta: Time + Status */}
+                <div className={`flex items-center gap-1 mt-1.5 text-[10px] ${isSender ? "justify-end text-pink-200/70" : "justify-start text-zinc-500"}`}>
                   <span>{formatTime(msg.timestamp)}</span>
                   {isSender && (
-                    <span>
-                      {msg.seen 
-                        ? <span className="text-blue-700">✓✓</span> 
-                        : <span className="text-white">✓✓</span>}
+                    <span className="ml-1 flex items-center">
+                      {msg.seen ? (
+                        <div className="flex text-blue-300">
+                          <FiCheck size={12} />
+                          <FiCheck size={12} className="-ml-1.5" />
+                        </div>
+                      ) : (
+                        <FiCheck size={12} className="text-white/50" />
+                      )}
                     </span>
                   )}
                 </div>
 
-                {/* Delete button */}
-                <button
-                  onClick={() => handleDeleteMessage(msg._id)}
-                  className="absolute hidden group-hover:block top-1 right-1 text-xs text-white/80 hover:text-red-500"
-                >
-                  <FiTrash2 />
-                </button>
+                {/* Delete Button (Hover) */}
+                {isSender && (
+                  <button
+                    onClick={() => handleDeleteMessage(msg._id)}
+                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-red-500/10 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20"
+                    title="Delete message"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -201,19 +224,25 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={sendMessage} className="p-3 border-t flex items-center gap-2 bg-white">
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
-        />
-        <button type="submit" className="p-2 rounded-full bg-pink-500 text-white hover:bg-pink-600 transition">
-          <FiSend size={18} />
-        </button>
-      </form>
+      {/* --- Input Area --- */}
+      <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm">
+        <form onSubmit={sendMessage} className="flex items-center gap-3 relative">
+            <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 transition-all shadow-inner"
+            />
+            <button 
+                type="submit" 
+                disabled={!newMessage.trim()}
+                className="p-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/20 hover:shadow-pink-500/40 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+                <FiSend size={18} className={newMessage.trim() ? "translate-x-0.5" : ""} />
+            </button>
+        </form>
+      </div>
     </div>
   );
 }
