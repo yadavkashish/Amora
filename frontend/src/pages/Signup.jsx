@@ -1,4 +1,4 @@
-// Signup.jsx (client)
+// src/pages/Signup.jsx  (replace your current file content)
 "use client";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
@@ -12,12 +12,11 @@ import {
   Loader2,
   Fingerprint,
   Users,
-  ChevronDown, // Added for the select dropdown
+  ChevronDown,
 } from "lucide-react";
+import SelfieCapture from "../components/SelfieCapture";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-// --- SHARED UI COMPONENTS ---
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 const BackgroundGrid = () => (
   <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-[#05030a]">
@@ -35,8 +34,6 @@ const BackgroundGrid = () => (
   </div>
 );
 
-// --- MAIN COMPONENT ---
-
 const Signup = () => {
   const [formData, setFormData] = useState({
     name: "",
@@ -44,35 +41,63 @@ const Signup = () => {
     password: "",
     gender: "",
   });
-  const [step, setStep] = useState("signup");
+  const [step, setStep] = useState("signup"); // signup -> selfie -> otp
   const [otp, setOtp] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // backend request (send-otp / verify-otp)
+  const [selfieProcessing, setSelfieProcessing] = useState(false); // visual indicator while selfie capture + upload is happening
+  const [serverMsg, setServerMsg] = useState("");
+  const [userId, setUserId] = useState(null);
   const navigate = useNavigate();
 
-  const handleSignup = async (e) => {
+  // When user clicks "Get Started" we validate gender and move to selfie step
+  const startSelfieStep = async (e) => {
     e.preventDefault();
     if (!formData.gender) {
       alert("Please select your gender.");
       return;
     }
+    // proceed to selfie capture step
+    setStep("selfie");
+  };
+
+  // Called by SelfieCapture when descriptor computed
+  // IMPORTANT: this function is async and will be awaited by SelfieCapture.
+  // We rethrow errors after setting local state so the SelfieCapture overlay can display error until it resolves.
+  const onSelfieCaptured = async (descriptor) => {
+    // Show global overlay while we send selfie to server
     setIsLoading(true);
+    setServerMsg("");
     try {
-      const response = await fetch(`${API_URL}/api/auth/send-otp`, {
+      const res = await fetch(`${API_URL}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email }),
+        body: JSON.stringify({ email: formData.email, descriptor }),
+        credentials: "include",
       });
-      if (response.ok) {
-        setStep("otp");
-      } else {
-        const data = await response.json();
-        alert("⚠️ " + (data.message || "Error sending OTP"));
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const message = data?.error || data?.message || "Failed to request OTP";
+        throw new Error(message);
       }
+
+      // backend returns userId or otp-created confirmation
+      setUserId(data.userId || data._id || null);
+      setStep("otp");
+      setServerMsg(`OTP sent to ${formData.email}`);
+
+      return { ok: true, data };
     } catch (err) {
-      console.error("❌ Error sending OTP:", err);
-      alert("❌ Failed to connect to server");
+      console.error("❌ send-otp error:", err);
+      alert("Failed to request OTP: " + (err.message || err));
+      setStep("signup");
+      // rethrow so SelfieCapture can show its processing/error overlay too
+      throw err;
     } finally {
       setIsLoading(false);
+      // ensure selfieProcessing cleared if SelfieCapture didn't already
+      setSelfieProcessing(false);
     }
   };
 
@@ -100,41 +125,56 @@ const Signup = () => {
     }
   };
 
+  // Global overlay component for processing states
+  const GlobalProcessingOverlay = ({ message = "Processing…" }) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative z-60 pointer-events-auto bg-black/80 text-white rounded-xl p-5 flex items-center gap-3 shadow-2xl">
+        <Loader2 className="animate-spin w-6 h-6" />
+        <div className="text-sm">{message}</div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#05050a] text-slate-200 px-4">
       <BackgroundGrid />
 
-      {/* Main Card Container - Reduced max-width and padding */}
+      {/* show global overlay when selfie is processing OR server request in-flight */}
+      {(selfieProcessing || isLoading) && (
+        <GlobalProcessingOverlay
+          message={selfieProcessing ? "Taking selfie… Please hold still" : "Processing…"}
+        />
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-[400px]" // Tighter max-width
+        className="relative z-10 w-full max-w-[400px]"
       >
-        {/* Refined Glow Effect */}
         <div className="absolute inset-0 bg-gradient-to-r from-pink-500/15 to-purple-500/15 blur-2xl -z-10 rounded-3xl" />
 
         <div className="bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.5)]">
-          
-          {/* Header */}
           <div className="text-center mb-7">
             <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 border border-white/10 mb-4 shadow-inner shadow-white/5">
               <Sparkles className="w-5 h-5 text-pink-400" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">
-              {step === "signup" ? "Create Account" : "Verify Email"}
+              {step === "signup" ? "Create Account" : step === "selfie" ? "Take a selfie" : "Verify Email"}
             </h2>
             <p className="text-zinc-400 text-sm font-light">
-              {step === "signup" 
-                ? "Join the community where chemistry matters." 
+              {step === "signup"
+                ? "Join the community where chemistry matters."
+                : step === "selfie"
+                ? "We need a short selfie to verify your profile photo later."
                 : `We sent a code to ${formData.email}`}
             </p>
           </div>
 
           {step === "signup" ? (
-            // --- SIGNUP FORM ---
-            <form onSubmit={handleSignup} className="space-y-3.5">
-              {/* Name Input */}
+            <form onSubmit={startSelfieStep} className="space-y-3.5">
+              {/* Name */}
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
                 <div className="relative group mt-1">
@@ -150,7 +190,7 @@ const Signup = () => {
                 </div>
               </div>
 
-              {/* Email Input */}
+              {/* Email */}
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">College Email</label>
                 <div className="relative group mt-1">
@@ -169,7 +209,7 @@ const Signup = () => {
                 </p>
               </div>
 
-              {/* Password Input */}
+              {/* Password */}
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Password</label>
                 <div className="relative group mt-1">
@@ -186,7 +226,7 @@ const Signup = () => {
                 </div>
               </div>
 
-              {/* Gender Input */}
+              {/* Gender */}
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Gender</label>
                 <div className="relative group mt-1">
@@ -206,24 +246,30 @@ const Signup = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <motion.button
                 whileHover={{ scale: 1.02, boxShadow: "0 10px 20px -10px rgba(236, 72, 153, 0.5)" }}
                 whileTap={{ scale: 0.98 }}
                 disabled={isLoading}
                 className="w-full mt-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden after:absolute after:inset-0 after:bg-white/20 after:opacity-0 hover:after:opacity-100 after:transition-opacity"
               >
-                {isLoading ? (
-                  <Loader2 className="animate-spin w-4 h-4" />
-                ) : (
-                  <>
-                    Get Started <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
+                {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>Get Started <ArrowRight className="w-4 h-4" /></>}
               </motion.button>
             </form>
+          ) : step === "selfie" ? (
+            <div className="space-y-4">
+              <SelfieCapture
+                modelsPath={`${import.meta.env.BASE_URL || '/'}models`}
+                // give SelfieCapture a setter so it can toggle the page-level overlay while it captures/awaits
+                setProcessing={(v) => setSelfieProcessing(!!v)}
+                onCaptured={onSelfieCaptured}
+              />
+
+              <div className="text-xs text-zinc-400">
+                By taking a selfie you agree we will use it only to verify your profile photo later. <br />
+                <button onClick={() => setStep("signup")} className="text-pink-400 underline text-xs mt-2">Go back</button>
+              </div>
+            </div>
           ) : (
-            // --- OTP FORM ---
             <form onSubmit={handleVerifyOtp} className="space-y-5">
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">One-Time Password</label>
@@ -247,18 +293,12 @@ const Signup = () => {
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                 {isLoading ? (
-                  <Loader2 className="animate-spin w-4 h-4" />
-                ) : (
-                  <>
-                    Verify & Complete <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
+                {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>Verify & Complete <ArrowRight className="w-4 h-4" /></>}
               </motion.button>
 
-              <button 
-                type="button" 
-                onClick={() => setStep('signup')}
+              <button
+                type="button"
+                onClick={() => setStep("signup")}
                 className="w-full text-xs text-zinc-500 hover:text-white transition-colors text-center"
               >
                 Entered wrong email? Go back
@@ -267,11 +307,10 @@ const Signup = () => {
           )}
         </div>
 
-        {/* Footer Links */}
         <div className="mt-6 text-center">
           <p className="text-zinc-500 text-xs">
             Already have an account?{" "}
-            <span onClick={() => navigate('/login')} className="text-pink-400 hover:text-pink-300 cursor-pointer font-medium transition-colors underline underline-offset-4">
+            <span onClick={() => navigate("/login")} className="text-pink-400 hover:text-pink-300 cursor-pointer font-medium transition-colors underline underline-offset-4">
               Log in
             </span>
           </p>

@@ -1,100 +1,225 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, User, MapPin, BookOpen, Camera, Send, CheckCircle, Loader, Briefcase, TrendingUp } from 'lucide-react';
+import { Heart, User, BookOpen, Camera, Send, CheckCircle, Loader, AlertCircle, XCircle } from 'lucide-react';
+import * as faceapi from 'face-api.js';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || '';
 
-// Framer Motion Variants for section entry
-const formVariants = {
+/* --- Framer Motion Variants --- */
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { type: 'spring', stiffness: 50, staggerChildren: 0.08 } 
-  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 50 }
+  }
 };
 
-const inputItemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0 },
-};
-
-// Component for a styled input group
+/* --- UI Components --- */
 const InputGroup = ({ children, title, icon: Icon }) => (
-  <motion.div 
-    variants={inputItemVariants}
-    className="bg-white p-6 rounded-2xl shadow-xl border border-pink-100"
+  <motion.div
+    variants={itemVariants}
+    className="bg-gray-900/50 backdrop-blur-md p-6 rounded-2xl border border-gray-800 shadow-xl"
   >
-    <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-pink-100 pb-2">
-      <Icon className="w-6 h-6 text-pink-500" />
+    <h3 className="text-lg font-semibold text-gray-200 mb-6 flex items-center gap-3 border-b border-gray-800 pb-3">
+      <div className="p-2 bg-violet-500/10 rounded-lg text-violet-400">
+        <Icon className="w-5 h-5" />
+      </div>
       {title}
     </h3>
-    <div className="space-y-4">
-      {children}
-    </div>
+    <div className="space-y-5">{children}</div>
   </motion.div>
 );
 
 export default function ProfileForm() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
-    age: '',
-    gender: '',
-    bio: '',
-    preference: '',
-    location: '',
-    interests: '',
-    branch: '',
-    course: '',
-    year: '',
+    name: '', age: '', gender: '', bio: '', preference: '',
+    location: '', interests: '', branch: '', course: '', year: '',
   });
+
   const [profilePicFile, setProfilePicFile] = useState(null);
+  const [profilePreviewUrl, setProfilePreviewUrl] = useState(null);
+  const profilePreviewRef = useRef(null);
   const [morePicsFiles, setMorePicsFiles] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // face-api states
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [verifyState, setVerifyState] = useState(null);
+  const [verifyDist, setVerifyDist] = useState(null);
+  const [verifiedDescriptor, setVerifiedDescriptor] = useState(null); // <-- captured descriptor
+  const verifyAbortRef = useRef(false);
+
+  const MODELS_BASE = `${import.meta.env.BASE_URL || '/'}models`.replace(/\/+/g, '/');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(`${MODELS_BASE}/tiny_face_detector`);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(`${MODELS_BASE}/face_landmark_68`);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(`${MODELS_BASE}/face_recognition`);
+        if (!mounted) return;
+        setModelsLoaded(true);
+        console.log('[ProfileForm] Models loaded');
+      } catch (err) {
+        console.error('[ProfileForm] Failed to load models', err);
+        setModelsLoaded(false);
+      }
+    })();
+    return () => { mounted = false; verifyAbortRef.current = true; revokePreviewUrl(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((s) => ({ ...s, [name]: value }));
+  };
+
+  function loadImageFromFile(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const url = URL.createObjectURL(file);
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+      img.src = url;
+    });
+  }
+
+  function revokePreviewUrl() {
+    if (profilePreviewRef.current) {
+      try { URL.revokeObjectURL(profilePreviewRef.current); } catch (e) {}
+      profilePreviewRef.current = null;
+    }
+    setProfilePreviewUrl(null);
+  }
+
+  const handleProfilePicSelected = async (file) => {
+    if (!file) return;
+    // reset previous verification state & descriptor
+    setVerifyState(null);
+    setVerifyDist(null);
+    setVerifiedDescriptor(null);
+    revokePreviewUrl();
+
+    if (!modelsLoaded) {
+      setVerifyState('error');
+      alert('Face verification models are loading. Please wait.');
+      return;
+    }
+
+    setVerifyState('checking');
+
+    try {
+      const img = await loadImageFromFile(file);
+      const detection = await faceapi
+        .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection || !detection.descriptor) {
+        setVerifyState('no_face');
+        setProfilePicFile(null);
+        return;
+      }
+
+      const descriptorArray = Array.from(detection.descriptor);
+
+      // POST descriptor to server for comparison
+      const res = await fetch(`${API_URL}/api/auth/compare-profile-descriptor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileDescriptor: descriptorArray }),
+        credentials: 'include',
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        setVerifyState('error');
+        alert('Not authorized. Please log in.');
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setVerifyState('error');
+        alert(data.error || 'Verification failed.');
+        return;
+      }
+
+      const { matched, dist } = data;
+      setVerifyDist(typeof dist === 'number' ? dist.toFixed(4) : null);
+
+      if (matched) {
+        // keep descriptor in state so we can send it on submit
+        setVerifiedDescriptor(descriptorArray);
+
+        // set preview (and keep a ref to revoke later)
+        const objUrl = URL.createObjectURL(file);
+        profilePreviewRef.current = objUrl;
+        setProfilePreviewUrl(objUrl);
+
+        setProfilePicFile(file);
+        setVerifyState('matched');
+      } else {
+        setVerifyState('not_matched');
+        setProfilePicFile(null);
+        setVerifiedDescriptor(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setVerifyState('error');
+      setProfilePicFile(null);
+      setVerifiedDescriptor(null);
+    }
   };
 
   const handleFileChange = (e, type) => {
     if (type === 'profilePic') {
-      setProfilePicFile(e.target.files[0]);
+      handleProfilePicSelected(e.target.files[0]);
     } else if (type === 'morePics') {
-      setMorePicsFiles(Array.from(e.target.files));
+      setMorePicsFiles(Array.from(e.target.files).slice(0, 5));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
 
+    // require verified descriptor
+    if (verifyState !== 'matched' || !profilePicFile || !verifiedDescriptor) {
+      alert('Please upload a profile picture that matches your signup selfie (verification required).');
+      return;
+    }
+
+    setLoading(true);
     try {
       const data = new FormData();
-
       Object.entries(formData).forEach(([key, value]) => {
         if (key === 'interests') {
-          value
-            .split(',')
-            .map((i) => i.trim())
-            .filter((i) => i.length > 0)
-            .forEach((i) => data.append('interests', i));
-        } else {
-          // Append values only if they are not empty strings or null
-          if (value !== '' && value !== null) {
-            data.append(key, value);
-          }
+          (value || '').split(',').map(i => i.trim()).filter(i => i).forEach(i => data.append('interests', i));
+        } else if (value) {
+          data.append(key, value);
         }
       });
 
-      if (profilePicFile) data.append('profilePic', profilePicFile);
-      if (morePicsFiles.length > 0) {
-        morePicsFiles.forEach((file) => data.append('morePics', file));
-      }
+      data.append('profilePic', profilePicFile);
+      morePicsFiles.forEach(f => data.append('morePics', f));
+
+      // append descriptor (so server can save encrypted descriptor to User)
+      data.append('profileDescriptor', JSON.stringify(verifiedDescriptor));
 
       const res = await fetch(`${API_URL}/api/profile/create`, {
         method: 'POST',
@@ -103,12 +228,11 @@ export default function ProfileForm() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        console.error("Profile creation failed:", errData);
-        alert(errData.error || "Error creating profile");
+        const errData = await res.json().catch(() => ({}));
+        console.error('Profile creation failed:', errData);
+        alert(errData.error || 'Error creating profile');
         return;
       }
-
       await res.json();
       navigate('/profile');
     } catch (err) {
@@ -119,270 +243,240 @@ export default function ProfileForm() {
     }
   };
 
-  // --- UI Variables (Themed for Pink/White) ---
-  const primaryColor = 'pink-600';
-  const accentColor = 'pink-400';
-  const bgColor = 'from-pink-50 via-white to-pink-100';
-  const inputClass = `w-full border border-gray-300 rounded-xl p-3 focus:ring-4 focus:ring-pink-200 focus:border-pink-500 transition-all shadow-sm focus:outline-none bg-white`;
-  const labelClass = "block text-sm font-bold text-gray-700 mb-1";
-  const fileInputClass = `block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-pink-100 file:text-pink-600 hover:file:bg-pink-200 transition shadow-sm`;
-  // ---------------------------------------------
+  // --- Styles ---
+  const inputBaseClass = `
+    w-full bg-black/20 border border-gray-700 rounded-xl px-4 py-3 
+    text-gray-100 placeholder-gray-500
+    focus:border-violet-500 focus:ring-1 focus:ring-violet-500 focus:outline-none 
+    transition-all duration-200
+  `;
+
+  const labelClass = 'block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1';
+  const fileInputClass = `
+    block w-full text-sm text-gray-400 
+    file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 
+    file:text-sm file:font-semibold file:bg-violet-500/10 file:text-violet-400 
+    hover:file:bg-violet-500/20 file:transition cursor-pointer
+  `;
 
   return (
-    <section className={`min-h-screen pt-23 bg-gradient-to-br ${bgColor} flex justify-center items-start py-12 px-4 sm:px-6`}>
-      <motion.div 
-        className={`max-w-3xl w-full bg-white rounded-3xl shadow-2xl p-6 sm:p-10 space-y-8 border-t-8 border-${accentColor}`}
-        variants={formVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="text-center">
-          <h2 className={`text-4xl font-extrabold text-${primaryColor} leading-tight`}>
-            Create Your Profile
-          </h2>
-          <p className="mt-2 text-lg text-gray-500">
-            Fill in your details to start connecting!
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans selection:bg-violet-500/30">
+      {/* Ambient Background Glow */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-900/20 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-fuchsia-900/10 rounded-full blur-[128px]" />
+      </div>
 
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          
-          {/* Group 1: Personal Basics */}
-          <InputGroup title="Personal Basics" icon={User}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <motion.div variants={inputItemVariants}>
-                <label className={labelClass}>Name</label>
-                <input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className={inputClass}
-                  placeholder="Your Name"
-                />
-              </motion.div>
-              <motion.div variants={inputItemVariants}>
-                <label className={labelClass}>Age</label>
-                <input
-                  type="number"
-                  name="age"
-                  value={formData.age}
-                  onChange={handleChange}
-                  required
-                  className={inputClass}
-                  placeholder="Your Age"
-                />
-              </motion.div>
-            </div>
+      <div className="relative z-10 max-w-4xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+          className="space-y-8"
+        >
+          {/* Header */}
+          <div className="text-center space-y-4 mb-12">
+            <motion.h2
+              variants={itemVariants}
+              className="text-4xl sm:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-400 via-fuchsia-400 to-white"
+            >
+              Setup Profile
+            </motion.h2>
+            <motion.p variants={itemVariants} className="text-lg text-gray-400 max-w-2xl mx-auto">
+              Complete your persona to match with others.
+            </motion.p>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <motion.div variants={inputItemVariants}>
-                <label className={labelClass}>Gender</label>
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  required
-                  className={inputClass}
-                >
-                  <option value="">Select Gender</option>
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
-                </select>
-              </motion.div>
-              <motion.div variants={inputItemVariants}>
-                <label className={labelClass}>Interested In</label>
-                <select
-                  name="preference"
-                  value={formData.preference}
-                  onChange={handleChange}
-                  required
-                  className={inputClass}
-                >
-                  <option value="">Select Preference</option>
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
-                  <option>Any</option>
-                </select>
-              </motion.div>
-            </div>
-            
-            <motion.div variants={inputItemVariants}>
-              <label className={labelClass}>Location</label>
-              <input
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="E.g., Muradnagar, Ghaziabad"
-              />
-            </motion.div>
-          </InputGroup>
+          <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* Group 2: Academic Details */}
-          <InputGroup title="Academic Details" icon={BookOpen}>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <motion.div variants={inputItemVariants}>
-                <label className={labelClass}>Course</label>
-                <select
-                  name="course"
-                  value={formData.course}
-                  onChange={handleChange}
-                  className={inputClass}
-                >
-                  <option value="">Course</option>
-                  <option>B.Tech</option>
-                  <option>M.Tech</option>
-                  <option>MBA</option>
-                  <option>B.Pharma</option>
-                  <option>M.Pharma</option>
-                  <option>B.Arch</option>
-                </select>
-              </motion.div>
-              <motion.div variants={inputItemVariants}>
-                <label className={labelClass}>Branch</label>
-                <select
-                  name="branch"
-                  value={formData.branch}
-                  onChange={handleChange}
-                  className={inputClass}
-                >
-                  <option value="">Branch</option>
-                  <option>CSE</option>
-                  <option>CSE-AIML</option>
-                  <option>CSE-AI</option>
-                  <option>CSIT</option>
-                  <option>IT</option>
-                  <option>ECE</option>
-                  <option>EEE</option>
-                  <option>ME</option>
-                  <option>Civil</option>
-                </select>
-              </motion.div>
-              <motion.div variants={inputItemVariants}>
-                <label className={labelClass}>Year</label>
-                <select
-                  name="year"
-                  value={formData.year}
-                  onChange={handleChange}
-                  className={inputClass}
-                >
-                  <option value="">Select Year</option>
-                  <option value="1">1st</option>
-                  <option value="2">2nd</option>
-                  <option value="3">3rd</option>
-                  <option value="4">4th</option>
-                  <option value="5">5th</option>
-                </select>
-              </motion.div>
-            </div>
-          </InputGroup>
-
-          {/* Group 3: Personality & Interests */}
-          <InputGroup title="Your Vibe & Interests" icon={Heart}>
-            <motion.div variants={inputItemVariants}>
-              <label className={labelClass}>Bio</label>
-              <textarea
-                name="bio"
-                value={formData.bio}
-                onChange={handleChange}
-                className={inputClass}
-                rows="4"
-                placeholder="Share a little about your passions, dreams, and what you look for in a connection..."
-              />
-            </motion.div>
-
-            <motion.div variants={inputItemVariants}>
-              <label className={labelClass}>Interests (comma separated)</label>
-              <input
-                name="interests"
-                value={formData.interests}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="E.g., coding, coffee, hiking, Marvel movies"
-              />
-            </motion.div>
-          </InputGroup>
-
-          {/* Group 4: Photos */}
-          <InputGroup title="Add Photos" icon={Camera}>
-            
-            {/* Profile Pic */}
-            <motion.div variants={inputItemVariants}>
-              <label className={labelClass}>📷 **Primary Profile Picture** (Required)</label>
-              <input
-                type="file"
-                accept="image/*"
-                required
-                onChange={(e) => handleFileChange(e, 'profilePic')}
-                className={fileInputClass}
-              />
-              {profilePicFile && (
-                <div className="mt-3 flex items-center gap-3 p-3 bg-pink-50 rounded-xl border border-pink-200">
-                  <img
-                    src={URL.createObjectURL(profilePicFile)}
-                    alt="Profile preview"
-                    className="w-16 h-16 object-cover rounded-full border-2 border-white shadow-md"
-                  />
-                  <span className='text-sm text-pink-700 font-medium flex items-center'><CheckCircle className='w-4 h-4 mr-1'/> Image Ready!</span>
+            {/* Group 1: Personal Basics */}
+            <InputGroup title="Identity" icon={User}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className={labelClass}>Full Name</label>
+                  <input name="name" value={formData.name} onChange={handleChange} required className={inputBaseClass} placeholder="John Doe" />
                 </div>
-              )}
-            </motion.div>
-
-            {/* More Pics */}
-            <motion.div variants={inputItemVariants}>
-              <label className={labelClass}>🖼️ More Pictures (Optional, up to 5)</label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => handleFileChange(e, 'morePics')}
-                className={fileInputClass}
-              />
-              {morePicsFiles.length > 0 && (
-                <div className="mt-3 flex gap-3 flex-wrap p-3 bg-gray-50 rounded-xl border border-gray-200">
-                  {morePicsFiles.map((file, i) => (
-                    <img
-                      key={i}
-                      src={URL.createObjectURL(file)}
-                      alt={`More preview ${i}`}
-                      className="w-16 h-16 object-cover rounded-lg border border-white shadow-md"
-                    />
-                  ))}
-                  <span className='text-xs font-medium text-gray-500 p-2 self-end'>{morePicsFiles.length} uploaded</span>
+                <div>
+                  <label className={labelClass}>Age</label>
+                  <input type="number" name="age" value={formData.age} onChange={handleChange} required className={inputBaseClass} placeholder="21" />
                 </div>
-              )}
-            </motion.div>
-          </InputGroup>
+              </div>
 
-          {/* Submit */}
-          <motion.button
-            type="submit"
-            disabled={loading}
-            className={`w-full bg-${primaryColor} text-white py-4 mt-6 rounded-xl text-lg font-extrabold hover:bg-pink-700 transition disabled:bg-gray-400 disabled:shadow-none shadow-xl shadow-pink-300/60 flex items-center justify-center gap-3`}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            variants={inputItemVariants}
-          >
-            {loading ? (
-              <>
-                <Loader className="animate-spin w-5 h-5" /> Submitting Profile...
-              </>
-            ) : (
-              <>
-                <Send className="w-5 h-5"/> Create Profile
-              </>
-            )}
-          </motion.button>
-        </form>
-      </motion.div>
-      <style jsx>{`
-        .shadow-2xl {
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
-        }
-      `}</style>
-    </section>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className={labelClass}>Gender</label>
+                  <select name="gender" value={formData.gender} onChange={handleChange} required className={`${inputBaseClass} appearance-none`}>
+                    <option value="" className="bg-gray-900">Select Identity</option>
+                    <option value="Male" className="bg-gray-900">Male</option>
+                    <option value="Female" className="bg-gray-900">Female</option>
+                    <option value="Other" className="bg-gray-900">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Interested In</label>
+                  <select name="preference" value={formData.preference} onChange={handleChange} required className={`${inputBaseClass} appearance-none`}>
+                    <option value="" className="bg-gray-900">Select Preference</option>
+                    <option value="Male" className="bg-gray-900">Male</option>
+                    <option value="Female" className="bg-gray-900">Female</option>
+                    <option value="Other" className="bg-gray-900">Other</option>
+                    <option value="Any" className="bg-gray-900">Any</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Location</label>
+                <input name="location" value={formData.location} onChange={handleChange} className={inputBaseClass} placeholder="City, Campus, etc." />
+              </div>
+            </InputGroup>
+
+            {/* Academic Details */}
+            <InputGroup title="Academics" icon={BookOpen}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div>
+                  <label className={labelClass}>Course</label>
+                  <select name="course" value={formData.course} onChange={handleChange} className={inputBaseClass}>
+                    <option value="" className="bg-gray-900">Select Course</option>
+                    <option className="bg-gray-900">B.Tech</option>
+                    <option className="bg-gray-900">M.Tech</option>
+                    <option className="bg-gray-900">MBA</option>
+                    <option className="bg-gray-900">B.Pharma</option>
+                    <option className="bg-gray-900">M.Pharma</option>
+                    <option className="bg-gray-900">B.Arch</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Branch</label>
+                  <select name="branch" value={formData.branch} onChange={handleChange} className={inputBaseClass}>
+                    <option value="" className="bg-gray-900">Select Branch</option>
+                    <option className="bg-gray-900">CSE</option>
+                    <option className="bg-gray-900">CSE-AIML</option>
+                    <option className="bg-gray-900">CSE-AI</option>
+                    <option className="bg-gray-900">CSIT</option>
+                    <option className="bg-gray-900">IT</option>
+                    <option className="bg-gray-900">ECE</option>
+                    <option className="bg-gray-900">EEE</option>
+                    <option className="bg-gray-900">ME</option>
+                    <option className="bg-gray-900">Civil</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Year</label>
+                  <select name="year" value={formData.year} onChange={handleChange} className={inputBaseClass}>
+                    <option value="" className="bg-gray-900">Year</option>
+                    <option value="1" className="bg-gray-900">1st</option>
+                    <option value="2" className="bg-gray-900">2nd</option>
+                    <option value="3" className="bg-gray-900">3rd</option>
+                    <option value="4" className="bg-gray-900">4th</option>
+                    <option value="5" className="bg-gray-900">5th</option>
+                  </select>
+                </div>
+              </div>
+            </InputGroup>
+
+            {/* Vibe & Interests */}
+            <InputGroup title="Vibe Check" icon={Heart}>
+              <div>
+                <label className={labelClass}>Bio</label>
+                <textarea name="bio" value={formData.bio} onChange={handleChange} className={inputBaseClass} rows="4" placeholder="What keeps you busy? What are you passionate about?" />
+              </div>
+              <div>
+                <label className={labelClass}>Interests (comma separated)</label>
+                <input name="interests" value={formData.interests} onChange={handleChange} className={inputBaseClass} placeholder="Coding, Gym, Anime, Chess..." />
+              </div>
+            </InputGroup>
+
+            {/* Photos */}
+            <InputGroup title="Gallery & Verification" icon={Camera}>
+              <div>
+                <label className={labelClass}>Primary Photo (Verification Required)</label>
+                <div className="p-4 border border-dashed border-gray-700 rounded-xl bg-gray-900/30 hover:bg-gray-900/50 transition-colors">
+                  <input type="file" accept="image/*" required onChange={(e) => handleFileChange(e, 'profilePic')} className={fileInputClass} />
+                </div>
+
+                {/* Verification Status UI */}
+                <div className="mt-4">
+                  {verifyState === 'checking' && (
+                    <div className="flex items-center gap-3 text-sm text-violet-300 bg-violet-500/10 p-3 rounded-lg border border-violet-500/20">
+                      <Loader className="animate-spin w-4 h-4" /> Analyzing biometric data...
+                    </div>
+                  )}
+
+                  {verifyState === 'matched' && profilePreviewUrl && (
+                    <div className="flex items-center gap-4 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                      <img src={profilePreviewUrl} alt="Preview" className="w-16 h-16 object-cover rounded-full ring-2 ring-emerald-500/50" />
+                      <div>
+                        <div className="text-sm font-semibold text-emerald-400 flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" /> Verified Identity
+                        </div>
+                        {verifyDist && <div className="text-xs text-emerald-500/60 mt-0.5">Confidence Score: {verifyDist}</div>
+                        }
+                        <div className="mt-1 text-xs text-emerald-300">Descriptor ready — will be sent with profile.</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {verifyState === 'not_matched' && (
+                    <div className="flex gap-3 p-3 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20 text-sm">
+                      <XCircle className="w-5 h-5 flex-shrink-0" />
+                      <div>
+                        <span className="font-bold">Verification Failed.</span> This photo does not match your signup selfie. Please upload a clear photo of yourself.
+                      </div>
+                    </div>
+                  )}
+
+                  {(verifyState === 'no_face' || verifyState === 'error') && (
+                    <div className="flex gap-3 p-3 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 text-sm">
+                      <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                      <span>Could not detect a clear face. Please try a different photo with good lighting.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Additional Photos (Optional, Max 5)</label>
+                <div className="p-4 border border-dashed border-gray-700 rounded-xl bg-gray-900/30">
+                  <input type="file" accept="image/*" multiple onChange={(e) => handleFileChange(e, 'morePics')} className={fileInputClass} />
+                </div>
+
+                {morePicsFiles.length > 0 && (
+                  <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+                    {morePicsFiles.map((file, i) => (
+                      <div key={i} className="relative group flex-shrink-0">
+                        <img src={URL.createObjectURL(file)} alt={`Extra ${i}`} className="w-20 h-20 object-cover rounded-lg border border-gray-700 shadow-lg" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </InputGroup>
+
+            <motion.button
+              type="submit"
+              disabled={loading}
+              className={`
+                w-full py-4 rounded-xl text-white font-bold text-lg tracking-wide
+                bg-gradient-to-r from-violet-600 to-fuchsia-600 
+                hover:from-violet-500 hover:to-fuchsia-500
+                focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-gray-900
+                disabled:opacity-50 disabled:cursor-not-allowed
+                shadow-lg shadow-violet-600/20 transition-all transform
+                flex items-center justify-center gap-3
+              `}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {loading ? (
+                <> <Loader className="animate-spin w-5 h-5" /> Processing... </>
+              ) : (
+                <> <Send className="w-5 h-5" /> Launch Profile </>
+              )}
+            </motion.button>
+
+          </form>
+        </motion.div>
+      </div>
+    </div>
   );
 }

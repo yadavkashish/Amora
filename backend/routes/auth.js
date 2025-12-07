@@ -6,6 +6,7 @@ const {
   login,
   forgotPassword,
   resetPassword,
+  compareProfileDescriptor, // new controller export
 } = require("../controllers/authController");
 const { protect } = require("../middleware/auth");
 const { otpLimiter, loginLimiter } = require("../middleware/rateLimiter");
@@ -45,22 +46,30 @@ router.get("/me", protect, async (req, res) => {
 router.get("/all-users", protect, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user._id);
-    
+
     if (!currentUser) {
       return res.status(404).json({ error: "Current user not found" });
     }
 
     // ✅ Filter users by same domain, excluding current user
-    const users = await User.find({ 
+    const users = await User.find({
       _id: { $ne: req.user._id },
-      emailDomain: currentUser.emailDomain // ✅ Only same college/domain
+      emailDomain: currentUser.emailDomain, // ✅ Only same college/domain
     }).select("-password");
-    
+
     res.json(users);
   } catch (err) {
     console.error("❌ Error fetching users:", err);
     res.status(500).json({ error: "Failed to fetch users" });
   }
 });
+
+/**
+ * POST /api/auth/compare-profile-descriptor
+ * Protected route — client should compute profile descriptor (face-api.js) and POST it.
+ * Body: { profileDescriptor: [ ... ] }
+ * Response: { matched: boolean, dist: number }
+ */
+router.post("/compare-profile-descriptor", protect, compareProfileDescriptor);
 
 module.exports = router;

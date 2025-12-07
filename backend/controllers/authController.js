@@ -1,8 +1,9 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+
 const Otp = require("../models/Otp");
 const { sendOtpEmail } = require("../utils/sendOtp");
 const bcrypt = require("bcryptjs");
+const { encryptDescriptor } = require("../utils/cryptoUtil");
 
 const createToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
@@ -17,99 +18,92 @@ const cookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-// ✅ Step 1: Send OTP (Signup)
+// helper to gen otp
+function genOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/**
+ * Send OTP
+ * Expects: { email, descriptor } where descriptor is face-api.js descriptor array (Float32) from client
+ * Stores encrypted descriptor in Otp document temporarily.
+ */
 exports.sendOtp = async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email is required" });
+    const { email, descriptor } = req.body;
+    if (!email || !descriptor) return res.status(400).json({ error: "Email and selfie descriptor are required" });
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // generate OTP
+    const otp = genOtp();
 
-    // remove old OTPs for this email
+    // remove existing OTP docs for this email
     await Otp.deleteMany({ email });
-    await Otp.create({ email, otp });
 
-    // send OTP to Gmail
+    // encrypt descriptor and store in Otp
+    const enc = encryptDescriptor(descriptor);
+    await Otp.create({ email, otp, signupSelfieEncrypted: enc });
+
+    // send OTP by email
     await sendOtpEmail(email, otp);
 
-    res.json({ message: "OTP sent to email" });
+    return res.json({ message: "OTP sent to email" });
   } catch (err) {
     console.error("❌ Error sending OTP:", err.message);
-    res.status(500).json({ error: "Error sending OTP" });
+    return res.status(500).json({ error: "Error sending OTP" });
   }
 };
 
-// ✅ Step 2: Verify OTP & Register User
+/**
+ * Verify OTP and Register User
+ * Expects: { name, email, password, otp, gender }
+ * Uses encrypted descriptor stored in Otp to save into newly created User.
+ */
 exports.verifyOtpAndRegister = async (req, res) => {
   try {
     const { name, email, password, otp, gender } = req.body;
-    
+
     if (!name || !email || !password || !otp || !gender)
       return res.status(400).json({ error: "All fields are required" });
 
-    // 🔑 Verify OTP
+    // lookup OTP doc with stored encrypted descriptor
     const record = await Otp.findOne({ email, otp });
-    if (!record)
-      return res.status(400).json({ error: "Invalid or expired OTP" });
+    if (!record) return res.status(400).json({ error: "Invalid or expired OTP" });
 
-    // 🔑 Prevent duplicate email
+    // prevent duplicate email
     const userExists = await User.findOne({ email });
-    if (userExists)
-      return res.status(400).json({ error: "Email already exists" });
+    if (userExists) return res.status(400).json({ error: "Email already exists" });
 
-    // ✅ Extract email domain
-    const emailDomain = email.substring(email.lastIndexOf('@')).toLowerCase();
-
-    // ✅ Create new user WITH emailDomain
-    const user = new User({ 
-      name, 
-      email, 
-      password, 
+    // create new user, persist encrypted signup selfie to user's record
+    const user = new User({
+      name,
+      email,
+      password,
       gender,
-      emailDomain // ✅ ADD THIS
+      signupSelfieEncrypted: record.signupSelfieEncrypted,
     });
     await user.save();
 
-    // 🔑 Clean up OTPs
+    // cleanup OTP records
     await Otp.deleteMany({ email });
 
-    // ✅ Generate JWT
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    // ✅ Set cookie
+    // generate token & set cookie
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const isProduction = process.env.NODE_ENV === "production";
-    
     res.cookie("token", token, {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "None" : "Lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/"
+      path: "/",
     });
 
-    console.log('✅ User registered and cookie set:', {
-      isProduction,
-      sameSite: isProduction ? "None" : "Lax",
-      secure: isProduction,
-      userEmail: user.email,
-      emailDomain: user.emailDomain // ✅ Log domain
-    });
-
-    res.status(201).json({
-      message: "🎉 Account created & logged in successfully",
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
-        gender: gender || null,
-        emailDomain: user.emailDomain // ✅ Return domain to frontend
-      },
+    return res.status(201).json({
+      message: "Account created & logged in successfully",
+      user: { id: user._id, name: user.name, email: user.email, gender: user.gender },
     });
   } catch (err) {
     console.error("❌ Registration error:", err.message);
-    res.status(500).json({ error: "Server error during registration" });
+    return res.status(500).json({ error: "Server error during registration" });
   }
 };
 
@@ -119,7 +113,7 @@ exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = genOtp();
 
     await Otp.deleteMany({ email });
     await Otp.create({ email, otp });
@@ -136,19 +130,17 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-    if (!email || !otp || !newPassword)
-      return res.status(400).json({ error: "All fields are required" });
+    if (!email || !otp || !newPassword) return res.status(400).json({ error: "All fields are required" });
 
     // ✅ Validate OTP
     const record = await Otp.findOne({ email, otp });
-    if (!record)
-      return res.status(400).json({ error: "Invalid or expired OTP" });
+    if (!record) return res.status(400).json({ error: "Invalid or expired OTP" });
 
     // ✅ Find user
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // ✅ Assign new password (plain text)
+    // ✅ Assign new password (will be hashed by pre-save)
     user.password = newPassword;
 
     // ✅ Save user (pre-save hook will hash password automatically)
@@ -171,51 +163,116 @@ exports.login = async (req, res) => {
 
     // Validate input
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      return res.status(400).json({ error: "Email and password required" });
     }
 
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     // Check password
     const isPasswordCorrect = await user.comparePassword(password);
     if (!isPasswordCorrect) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     // ✅ CREATE JWT TOKEN
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
     // ✅ SET COOKIE WITH CORRECT OPTIONS
-    res.cookie('token', token, {
+    res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Lax',
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/'
+      path: "/",
     });
 
-    console.log('✅ Login successful, cookie set:', token.substring(0, 10) + '...');
+    console.log("✅ Login successful, cookie set:", token.substring(0, 10) + "...");
 
     res.json({
       success: true,
-      message: 'Login successful',
+      message: "Login successful",
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        emailDomain: user.emailDomain // ✅ Return domain
-      }
+        emailDomain: user.emailDomain, // ✅ Return domain
+      },
     });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Login failed" });
   }
 };
+
+/**
+ * Compare profile descriptor to stored signup selfie descriptor.
+ * Expects protected route (req.user populated by protect middleware).
+ * Body: { profileDescriptor: [...] }
+ * Uses AES-GCM decrypt to get stored signup descriptor and returns { matched, dist }.
+ */
+// controllers/authController.js
+
+// controllers/authController.js (replace compareProfileDescriptor)
+const { decryptDescriptor } = require("../utils/cryptoUtil");
+const User = require("../models/User");
+
+function euclidean(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+    throw new Error("Invalid descriptor lengths");
+  }
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const d = a[i] - b[i];
+    sum += d * d;
+  }
+  return Math.sqrt(sum);
+}
+
+exports.compareProfileDescriptor = async (req, res) => {
+  try {
+    const userId = req.user && (req.user._id || req.user.userId);
+    if (!userId) return res.status(401).json({ error: "Not authorized" });
+
+    const newDesc = req.body.profileDescriptor;
+    if (!newDesc || !Array.isArray(newDesc)) {
+      return res.status(400).json({ error: "profileDescriptor is required (array)" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // choose base descriptor: latest profile descriptor (preferred) else signup selfie
+    let baseEncrypted = user.profileDescriptorEncrypted || user.signupSelfieEncrypted;
+    if (!baseEncrypted) {
+      return res.status(404).json({ error: "No stored descriptor to compare with" });
+    }
+
+    let baseDesc;
+    try {
+      baseDesc = decryptDescriptor(baseEncrypted);
+    } catch (e) {
+      console.error("Failed to decrypt stored descriptor:", e);
+      return res.status(500).json({ error: "Failed to decrypt stored descriptor" });
+    }
+
+    // compute euclidean distance and match threshold
+    const dist = euclidean(baseDesc, newDesc);
+    const threshold = parseFloat(process.env.FACE_MATCH_THRESHOLD || "0.55");
+    const matched = dist <= threshold;
+
+    // Save verification flag on user (do not overwrite stored profileDescriptorEncrypted here)
+    user.profileVerified = matched;
+    await user.save();
+
+    return res.json({ matched, dist });
+  } catch (err) {
+    console.error("❌ compareProfileDescriptor error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+

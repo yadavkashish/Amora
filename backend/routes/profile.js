@@ -6,10 +6,14 @@ const multer = require("multer");
 const cloudinary = require("../config/cloudinary");
 const { protect } = require("../middleware/auth");
 
-// Use memory storage so we can stream buffer to Cloudinary
+// added for descriptor saving
+const User = require("../models/User");
+const { encryptDescriptor } = require("../utils/cryptoUtil");
+
+// Use memory storage for Cloudinary buffer uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Tolerant import for your helper util
+// tolerant cloudinary upload util
 const uploadUtil = require("../utils/uploadToCloudinary");
 const uploadBuffer =
   uploadUtil.uploadBuffer ||
@@ -17,22 +21,22 @@ const uploadBuffer =
   uploadUtil.default ||
   uploadUtil;
 
-// Helper that tries common call signatures for uploadBuffer
 async function callUploadBuffer(buffer, folder) {
   try {
     return await uploadBuffer(buffer, { folder });
-  } catch (err) {
+  } catch (e1) {
     try {
       return await uploadBuffer(buffer, folder);
-    } catch (err2) {
-      throw err;
+    } catch (e2) {
+      throw e1;
     }
   }
 }
 
-/** POST /api/profile/create
- *  Creates a profile and uploads files to Cloudinary
- */
+/* =======================================================
+   POST /api/profile/create
+   Creates profile + uploads files + stores descriptor
+   ======================================================= */
 router.post(
   "/create",
   protect,
@@ -43,24 +47,24 @@ router.post(
   ]),
   async (req, res) => {
     try {
-      // Normalize interests
+      // Handle interests
       let interests = req.body.interests || req.body["interests[]"] || [];
       if (!Array.isArray(interests)) interests = [interests];
-      interests = interests.filter((i) => i && i.trim().length > 0);
+      interests = interests.filter((i) => i?.trim().length > 0);
 
-      // Upload profilePic if provided
+      // Upload profile picture
       let profilePic = null;
       let profilePicPublicId = null;
       if (req.files?.profilePic?.[0]) {
-        const result = await callUploadBuffer(
+        const up = await callUploadBuffer(
           req.files.profilePic[0].buffer,
           "amora/profilePics"
         );
-        profilePic = result.secure_url || result.url;
-        profilePicPublicId = result.public_id || result.publicId || null;
+        profilePic = up.secure_url || up.url;
+        profilePicPublicId = up.public_id || up.publicId || null;
       }
 
-      // Upload morePics if provided (parallel)
+      // Upload optional more pictures
       let morePics = [];
       let morePicsPublicIds = [];
       if (req.files?.morePics?.length) {
@@ -75,18 +79,21 @@ router.post(
         });
       }
 
-      // Upload coverImage if provided
+      // Upload cover image
       let coverImage = null;
       let coverImagePublicId = null;
-      if (req.files?.coverImage?.[0]) {
-        const result = await callUploadBuffer(
+      if (req.files?.coverImage?.length) {
+        const up = await callUploadBuffer(
           req.files.coverImage[0].buffer,
           "amora/covers"
         );
-        coverImage = result.secure_url || result.url;
-        coverImagePublicId = result.public_id || result.publicId || null;
+        coverImage = up.secure_url || up.url;
+        coverImagePublicId = up.public_id || up.publicId || null;
       }
 
+      /* -------------------------------------------
+         SAVE NEW PROFILE TO DB
+         ------------------------------------------- */
       const profile = new Profile({
         user: req.user._id,
         name: req.body.name,
@@ -108,7 +115,32 @@ router.post(
       });
 
       await profile.save();
-      res.status(201).json({ success: true, profile });
+
+      /* -------------------------------------------
+         SAVE VERIFIED FACE DESCRIPTOR TO USER
+         (from profileDescriptor in request)
+         ------------------------------------------- */
+      if (req.body.profileDescriptor) {
+        try {
+          const parsed =
+            typeof req.body.profileDescriptor === "string"
+              ? JSON.parse(req.body.profileDescriptor)
+              : req.body.profileDescriptor;
+
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const enc = encryptDescriptor(parsed);
+
+            await User.findByIdAndUpdate(req.user._id, {
+              profileDescriptorEncrypted: enc,
+              profileVerified: true,
+            });
+          }
+        } catch (err) {
+          console.warn("⚠️ Failed to save verified descriptor:", err.message);
+        }
+      }
+
+      return res.status(201).json({ success: true, profile });
     } catch (err) {
       console.error("❌ Profile creation error:", err);
       res.status(400).json({ success: false, error: err.message });
@@ -116,37 +148,40 @@ router.post(
   }
 );
 
-/** GET latest profile for logged-in user */
+/* =======================================================
+   GET latest profile (logged-in user)
+   ======================================================= */
 router.get("/latest", protect, async (req, res) => {
   try {
     const latestProfile = await Profile.findOne({ user: req.user._id }).sort({
       createdAt: -1,
     });
     if (!latestProfile)
-      return res.status(404).json({ error: "No profiles found for this user" });
+      return res.status(404).json({ error: "No profiles found" });
+
     res.json(latestProfile);
   } catch (error) {
-    console.error("❌ Error fetching latest profile:", error);
     res.status(500).json({ error: "Server error fetching profile" });
   }
 });
 
-/** GET all profiles of current user */
+/* =======================================================
+   GET all profiles of logged-in user
+   ======================================================= */
 router.get("/all", protect, async (req, res) => {
   try {
     const profiles = await Profile.find({ user: req.user._id }).sort({
       createdAt: -1,
     });
-    res.status(200).json(profiles);
+    res.json(profiles);
   } catch (error) {
-    console.error("❌ Error fetching user profiles:", error);
-    res.status(500).json({ error: "Failed to fetch user profiles" });
+    res.status(500).json({ error: "Failed to fetch profiles" });
   }
 });
 
-/** POST /api/profile/:id/photos
- *  Append morePics (uploads) to an existing profile
- */
+/* =======================================================
+   POST /:id/photos — Add more photos
+   ======================================================= */
 router.post(
   "/:id/photos",
   protect,
@@ -154,13 +189,14 @@ router.post(
   async (req, res) => {
     try {
       const profile = await Profile.findById(req.params.id);
-      if (!profile) return res.status(404).json({ error: "Profile not found" });
+      if (!profile)
+        return res.status(404).json({ error: "Profile not found" });
+
       if (profile.user.toString() !== req.user._id.toString())
         return res.status(403).json({ error: "Unauthorized" });
 
-      if (!req.files || req.files.length === 0) {
+      if (!req.files?.length)
         return res.status(400).json({ error: "No files provided" });
-      }
 
       const uploads = await Promise.all(
         req.files.map((f) => callUploadBuffer(f.buffer, "amora/morePics"))
@@ -172,17 +208,16 @@ router.post(
       });
 
       await profile.save();
-      res.status(200).json({ success: true, profile });
+      res.json({ success: true, profile });
     } catch (err) {
-      console.error("❌ Error uploading photos:", err);
-      res.status(500).json({ error: err.message || "Failed to upload photos" });
+      res.status(500).json({ error: err.message });
     }
   }
 );
 
-/** PUT /api/profile/:id/cover
- *  Upload or update cover image
- */
+/* =======================================================
+   PUT /:id/cover — Update cover photo
+   ======================================================= */
 router.put(
   "/:id/cover",
   protect,
@@ -190,45 +225,45 @@ router.put(
   async (req, res) => {
     try {
       const profile = await Profile.findById(req.params.id);
-      if (!profile) return res.status(404).json({ error: "Profile not found" });
+      if (!profile)
+        return res.status(404).json({ error: "Profile not found" });
+
       if (profile.user.toString() !== req.user._id.toString())
         return res.status(403).json({ error: "Unauthorized" });
 
-      if (!req.file) {
+      if (!req.file)
         return res.status(400).json({ error: "No file uploaded" });
-      }
 
-      // Delete old cover from Cloudinary if exists
       if (profile.coverImagePublicId) {
         try {
           await cloudinary.uploader.destroy(profile.coverImagePublicId);
-        } catch (e) {
-          console.warn("Failed to destroy old cover image:", e.message);
-        }
+        } catch (e) {}
       }
 
-      // Upload new cover
-      const up = await callUploadBuffer(req.file.buffer, "amora/covers");
+      const up = await callUploadBuffer(
+        req.file.buffer,
+        "amora/covers"
+      );
+
       profile.coverImage = up.secure_url || up.url;
       profile.coverImagePublicId = up.public_id || up.publicId || null;
 
       await profile.save();
-      res.status(200).json({ success: true, profile });
+      res.json({ success: true, profile });
     } catch (err) {
-      console.error("❌ Error uploading cover:", err);
-      res
-        .status(500)
-        .json({ error: err.message || "Failed to upload cover image" });
+      res.status(500).json({ error: err.message });
     }
   }
 );
 
-/** GET all profiles except logged-in user (filters supported) */
+/* =======================================================
+   GET /all-profiles — Everyone except current user
+   ======================================================= */
 router.get("/all-profiles", protect, async (req, res) => {
   try {
     const { gender, branch, course, year, interest } = req.query;
-    const filter = { user: { $ne: req.user._id } };
 
+    const filter = { user: { $ne: req.user._id } };
     if (gender) filter.gender = gender;
     if (branch) filter.branch = branch;
     if (course) filter.course = course;
@@ -241,43 +276,47 @@ router.get("/all-profiles", protect, async (req, res) => {
       )
       .populate("user", "email");
 
-    res.status(200).json(profiles);
+    res.json(profiles);
   } catch (error) {
-    console.error("❌ Error fetching profiles:", error);
     res.status(500).json({ error: "Failed to fetch profiles" });
   }
 });
 
-/** GET profile by user id */
+/* =======================================================
+   GET profile by userId
+   ======================================================= */
 router.get("/user/:userId", protect, async (req, res) => {
   try {
-    const profile = await Profile.findOne({ user: req.params.userId }).populate(
-      "user",
-      "name email profilePic"
-    );
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    const profile = await Profile.findOne({
+      user: req.params.userId,
+    }).populate("user", "name email profilePic");
+
+    if (!profile) return res.status(404).json({ error: "Not found" });
+
     res.json(profile);
   } catch (err) {
-    console.error("Error fetching other user profile:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-/** GET profile by profile id */
+/* =======================================================
+   GET profile by id
+   ======================================================= */
 router.get("/:id", protect, async (req, res) => {
   try {
     const profile = await Profile.findById(req.params.id);
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    if (!profile)
+      return res.status(404).json({ error: "Profile not found" });
+
     res.json(profile);
-  } catch (error) {
-    console.error("❌ Error fetching profile:", error);
+  } catch (err) {
     res.status(500).json({ error: "Server error fetching profile" });
   }
 });
 
-/** PUT /api/profile/:id
- *  Update all profile fields + handle cover image, profilePic, and morePics
- */
+/* =======================================================
+   PUT /:id — Update profile + Save Descriptor
+   ======================================================= */
 router.put(
   "/:id",
   protect,
@@ -289,11 +328,13 @@ router.put(
   async (req, res) => {
     try {
       const profile = await Profile.findById(req.params.id);
-      if (!profile) return res.status(404).json({ error: "Profile not found" });
+      if (!profile)
+        return res.status(404).json({ error: "Profile not found" });
+
       if (profile.user.toString() !== req.user._id.toString())
         return res.status(403).json({ error: "Unauthorized" });
 
-      // Update simple fields
+      // Update text fields
       const fields = [
         "name",
         "age",
@@ -305,6 +346,7 @@ router.put(
         "course",
         "year",
       ];
+
       fields.forEach((f) => {
         if (req.body[f] != null) profile[f] = req.body[f];
       });
@@ -322,18 +364,13 @@ router.put(
         profile.interests = Array.isArray(interests) ? interests : [interests];
       }
 
-      // ========== COVER IMAGE HANDLING ==========
+      // Cover image update
       if (req.files?.coverImage?.[0]) {
-        if (profile.coverImagePublicId) {
+        if (profile.coverImagePublicId)
           try {
             await cloudinary.uploader.destroy(profile.coverImagePublicId);
-          } catch (delErr) {
-            console.warn(
-              "⚠️ Failed to destroy old coverImage on Cloudinary:",
-              delErr.message
-            );
-          }
-        }
+          } catch (err) {}
+
         const up = await callUploadBuffer(
           req.files.coverImage[0].buffer,
           "amora/covers"
@@ -342,66 +379,56 @@ router.put(
         profile.coverImagePublicId = up.public_id || up.publicId || null;
       }
 
-      // ========== PROFILE PIC HANDLING ==========
+      // Profile pic update
       if (req.files?.profilePic?.[0]) {
-        if (profile.profilePicPublicId) {
+        if (profile.profilePicPublicId)
           try {
             await cloudinary.uploader.destroy(profile.profilePicPublicId);
-          } catch (delErr) {
-            console.warn(
-              "⚠️ Failed to destroy old profilePic on Cloudinary:",
-              delErr.message
-            );
-          }
-        }
+          } catch (err) {}
+
         const up = await callUploadBuffer(
           req.files.profilePic[0].buffer,
           "amora/profilePics"
         );
+
         profile.profilePic = up.secure_url || up.url;
         profile.profilePicPublicId = up.public_id || up.publicId || null;
       }
 
-      // ========== MORE PICS HANDLING ==========
+      // More pics update
       let existingPics =
         req.body["existingMorePics[]"] || req.body.existingMorePics || [];
       if (!Array.isArray(existingPics))
         existingPics = existingPics ? [existingPics] : [];
 
-      // Delete removed pics from Cloudinary
-      const keepUrls = new Set(existingPics);
-      const urlsToKeep = [];
-      const publicIdsToKeep = [];
-      for (let i = 0; i < (profile.morePics || []).length; i++) {
+      const keepSet = new Set(existingPics);
+      const keptUrls = [];
+      const keptIds = [];
+
+      for (let i = 0; i < profile.morePics.length; i++) {
         const url = profile.morePics[i];
-        const pubId =
-          (profile.morePicsPublicIds && profile.morePicsPublicIds[i]) || null;
-        if (keepUrls.has(url)) {
-          urlsToKeep.push(url);
-          publicIdsToKeep.push(pubId);
-        } else {
-          if (pubId) {
-            try {
-              await cloudinary.uploader.destroy(pubId);
-            } catch (err) {
-              console.warn(
-                "⚠️ Failed to destroy morePic on Cloudinary:",
-                err.message
-              );
-            }
-          }
+        const id = profile.morePicsPublicIds[i];
+
+        if (keepSet.has(url)) {
+          keptUrls.push(url);
+          keptIds.push(id);
+        } else if (id) {
+          try {
+            await cloudinary.uploader.destroy(id);
+          } catch (err) {}
         }
       }
-      profile.morePics = urlsToKeep;
-      profile.morePicsPublicIds = publicIdsToKeep;
 
-      // Append newly uploaded morePics
+      profile.morePics = keptUrls;
+      profile.morePicsPublicIds = keptIds;
+
       if (req.files?.morePics?.length) {
         const uploads = await Promise.all(
           req.files.morePics.map((f) =>
             callUploadBuffer(f.buffer, "amora/morePics")
           )
         );
+
         uploads.forEach((u) => {
           profile.morePics.push(u.secure_url || u.url);
           profile.morePicsPublicIds.push(u.public_id || u.publicId || null);
@@ -409,9 +436,32 @@ router.put(
       }
 
       await profile.save();
-      res.status(200).json(profile);
+
+      /* ------------------------------------------------------
+         Save verified descriptor when updating profile photo
+         ------------------------------------------------------ */
+      if (req.body.profileDescriptor) {
+        try {
+          const parsed =
+            typeof req.body.profileDescriptor === "string"
+              ? JSON.parse(req.body.profileDescriptor)
+              : req.body.profileDescriptor;
+
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const enc = encryptDescriptor(parsed);
+
+            await User.findByIdAndUpdate(req.user._id, {
+              profileDescriptorEncrypted: enc,
+              profileVerified: true,
+            });
+          }
+        } catch (err) {
+          console.warn("⚠️ Failed saving new descriptor:", err.message);
+        }
+      }
+
+      res.json(profile);
     } catch (err) {
-      console.error("❌ Error updating profile:", err);
       res.status(500).json({ error: err.message || "Server error updating profile" });
     }
   }
