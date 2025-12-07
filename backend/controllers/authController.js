@@ -1,27 +1,34 @@
+// controllers/authController.js
 const jwt = require("jsonwebtoken");
-
 const Otp = require("../models/Otp");
+const User = require("../models/User");
 const { sendOtpEmail } = require("../utils/sendOtp");
 const bcrypt = require("bcryptjs");
-const { encryptDescriptor } = require("../utils/cryptoUtil");
+const { encryptDescriptor, decryptDescriptor } = require("../utils/cryptoUtil");
+require('dotenv').config();
+
+// helper to gen otp
+function genOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// cookie options factory (so SameSite = None in production)
+function cookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: isProd, // Secure must be true when SameSite=None
+    sameSite: isProd ? "None" : "Lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+}
 
 const createToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
 };
-
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production" ? true : false,
-  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
-
-// helper to gen otp
-function genOtp() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
 
 /**
  * Send OTP
@@ -87,15 +94,8 @@ exports.verifyOtpAndRegister = async (req, res) => {
     await Otp.deleteMany({ email });
 
     // generate token & set cookie
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    const isProduction = process.env.NODE_ENV === "production";
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "None" : "Lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
+    const token = createToken(user._id);
+    res.cookie("token", token, cookieOptions());
 
     return res.status(201).json({
       message: "Account created & logged in successfully",
@@ -179,18 +179,12 @@ exports.login = async (req, res) => {
     }
 
     // ✅ CREATE JWT TOKEN
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = createToken(user._id);
 
-    // ✅ SET COOKIE WITH CORRECT OPTIONS
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "Lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
+    // ✅ SET COOKIE WITH CORRECT OPTIONS (SameSite None in production)
+    res.cookie("token", token, cookieOptions());
 
-    console.log("✅ Login successful, cookie set:", token.substring(0, 10) + "...");
+    console.log("✅ Login successful, cookie set");
 
     res.json({
       success: true,
@@ -199,7 +193,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        emailDomain: user.emailDomain, // ✅ Return domain
+        emailDomain: user.emailDomain,
       },
     });
   } catch (err) {
@@ -208,18 +202,7 @@ exports.login = async (req, res) => {
   }
 };
 
-/**
- * Compare profile descriptor to stored signup selfie descriptor.
- * Expects protected route (req.user populated by protect middleware).
- * Body: { profileDescriptor: [...] }
- * Uses AES-GCM decrypt to get stored signup descriptor and returns { matched, dist }.
- */
-// controllers/authController.js
-
-// controllers/authController.js (replace compareProfileDescriptor)
-const { decryptDescriptor } = require("../utils/cryptoUtil");
-const User = require("../models/User");
-
+// ---------- helper euclidean for descriptor compare ----------
 function euclidean(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
     throw new Error("Invalid descriptor lengths");
@@ -232,6 +215,7 @@ function euclidean(a, b) {
   return Math.sqrt(sum);
 }
 
+// Compare profile descriptor to stored signup selfie descriptor.
 exports.compareProfileDescriptor = async (req, res) => {
   try {
     const userId = req.user && (req.user._id || req.user.userId);
@@ -274,5 +258,3 @@ exports.compareProfileDescriptor = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
-
-

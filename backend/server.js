@@ -1,6 +1,6 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const http = require('http');
@@ -23,9 +23,10 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      'http://localhost:5174',         // Local dev
+      'http://localhost:5173', // dev client (note: your earlier io allowed 5174 too; adjust if needed)
       'https://amorateams.netlify.app',
-      'https://www.amoraonline.in'
+      'https://www.amoraonline.in',
+      // add any other frontend origins here
     ],
     credentials: true
   }
@@ -49,37 +50,42 @@ io.on('connection', (socket) => {
   });
 });
 
-// ✅ Middleware
-// ✅ CORS setup (must come before routes)
+// ------------------ CORS + preflight middleware ------------------
+// Allowed origins for your app (adjust if you add domains)
 const allowedOrigins = [
   'http://localhost:5173',
   'https://amorateams.netlify.app',
-  'https://www.amoraonline.in'
+  'https://www.amoraonline.in',
+  // add any other production/staging frontend domains here
 ];
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins.includes(origin)) {
+    // echo origin to allow credentials across domains
     res.header("Access-Control-Allow-Origin", origin);
   }
+  // allowed methods
   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  // allow necessary headers from client (Cookie required for some preflight checks)
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie");
+  // allow credentials (cookies)
   res.header("Access-Control-Allow-Credentials", "true");
+  // allow browser to read Set-Cookie header (usually not needed for cookies, but safe to expose other headers if required)
+  res.header("Access-Control-Expose-Headers", "Set-Cookie");
 
-  // ✅ Handle preflight (OPTIONS) requests immediately
+  // handle preflight quickly
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
   next();
 });
-
+// ----------------------------------------------------------------
 
 app.use(express.json());
 app.use(cookieParser());
 
-
-
-// ✅ Routes
+// Routes
 app.use('/api/users', userRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/auth', authRoutes);
@@ -88,7 +94,7 @@ app.use('/api/chat', chatRoutes);
 app.use("/api/compatibility", compatibilityRoutes);
 app.use("/api/personality", personalityRoutes);
 
-// ✅ MongoDB connection
+// Mongo + start server
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
@@ -99,7 +105,7 @@ mongoose.connect(MONGO_URI, {
 .then(() => {
   console.log('✅ Connected to MongoDB');
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
   });
 })
 .catch((err) => {
