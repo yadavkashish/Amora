@@ -6,12 +6,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
+    <!-- Preconnect important origins (keep <=4) -->
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link rel="preconnect" href="https://amora-mx7x.onrender.com" crossorigin>
+    <link rel="preconnect" href="https://static.sketchfab.com" crossorigin>
+    <link rel="preconnect" href="https://grainy-gradients.vercel.app" crossorigin>
+
+    <!-- Preload hero image + critical font -->
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1621784563330-caee0b138a00?auto=format&fit=crop&w=1000&q=80">
+    <link rel="preload" href="/fonts/Inter.woff2" as="font" type="font/woff2" crossorigin>
+
     <!-- Primary SEO -->
     <title>Amora | Smart College Dating & Compatibility App</title>
     <meta name="description" content="Find your perfect college match with Amora — a smart compatibility-based dating platform that connects students using personality analysis and emotional intelligence." />
     <meta name="keywords" content="dating app, college dating, compatibility match, personality-based dating, emotional intelligence, Amora" />
     <meta name="author" content="Kashish Yadav" />
     <link rel="canonical" href="https://www.amoraonline.in" />
+  
+    <!-- === Tiny critical CSS (only above-the-fold / hero rules) === -->
+    <style>
+      /* Keep this very small — only what the hero/above-the-fold needs */
+      :root { background-color: black; }
+      html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+      .hero, #root { min-height: 80vh; display: block; }
+      /* minimal hero layout rules only */
+    </style>
+
+    <!-- Non-blocking load for main CSS (preload -> onload switch) -->
+    <link rel="preload" href="/assets/index-DqxqBBUW.css" as="style" onload="this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/assets/index-DqxqBBUW.css"></noscript>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="https://www.amoraonline.in/images/image.png" />
@@ -32,30 +55,60 @@
     <meta name="twitter:image" content="https://www.amoraonline.in/images/image.png" />
 
     <!-- Structured Data (JSON-LD) -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  "name": "Amora",
-  "url": "https://www.amoraonline.in",
-  "description": "Smart college dating app that matches students using personality compatibility and emotional intelligence.",
-  "applicationCategory": "DatingApplication",
-  "operatingSystem": "Web",
-  "author": {
-    "@type": "Person",
-    "name": "Kashish Yadav"
-  },
-  "screenshot": "https://www.amoraonline.in/images/image.png"
-}
-</script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Amora",
+      "url": "https://www.amoraonline.in",
+      "description": "Smart college dating app that matches students using personality compatibility and emotional intelligence.",
+      "applicationCategory": "DatingApplication",
+      "operatingSystem": "Web",
+      "author": {
+        "@type": "Person",
+        "name": "Kashish Yadav"
+      },
+      "screenshot": "https://www.amoraonline.in/images/image.png"
+    }
+    </script>
 
+    <!-- Modulepreload for main JS so it can be fetched early without blocking rendering -->
+    <link rel="modulepreload" href="/assets/index-Dp3rJu5k.js">
 
-    <!-- Sketchfab Viewer -->
-    <script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+    <!-- IMPORTANT: do not include blocking 3rd-party scripts here -->
+    <!-- Sketchfab will be loaded lazily after page load / interaction below -->
+
   </head>
 
   <body>
     <div id="root"></div>
+
+    <!-- Main app (module scripts are deferred by default) -->
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Lazy-load Sketchfab after load or on first user interaction -->
+    <script>
+      (function loadSketchfabWhenIdle() {
+        var sketchfabUrl = "https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js";
+        var loaded = false;
+        function insertScript() {
+          if (loaded) return;
+          loaded = true;
+          var s = document.createElement('script');
+          s.src = sketchfabUrl;
+          s.defer = true;
+          document.body.appendChild(s);
+        }
+        // Prefer after window load + small delay
+        window.addEventListener('load', function() {
+          // give LCP a tiny breathing room
+          setTimeout(insertScript, 250);
+        }, {passive:true});
+        // Or on first user interaction (whichever comes first)
+        ['scroll','keydown','pointerdown','touchstart'].forEach(function(ev){
+          window.addEventListener(ev, insertScript, {once:true, passive:true});
+        });
+      })();
+    </script>
   </body>
 </html>

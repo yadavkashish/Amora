@@ -1,22 +1,25 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+// Eager (critical for first paint)
 import HomePage from './pages/HomePage';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
 import Header from './components/Header';
-import ProfileForm from './pages/ProfileForm';
-import Profile from './pages/Profile';
-import Dashboard from './pages/Dashboard';
-import ChatPage from './pages/ChatPage'; 
-import ViewProfile from './components/ViewProfile'
-import CompatibilityForm from './pages/CompatibilityForm'
-import Privacy from './components/Privacy'
-import Contact from './components/Contact'
-import Terms from './components/Terms'
-import Footer from './components/Footer'
-import PersonalityReport from './pages/PersonalityReport';
-import PersonalityReportDisplay from './pages/PersonalityReport';
-import PersonalityReportPage from "./pages/PersonalityReportPage";
+import Footer from './components/Footer';
+
+// Lazy (split into separate chunks)
+const Login = lazy(() => import(/* webpackChunkName: "login" */ './pages/Login'));
+const Signup = lazy(() => import(/* webpackChunkName: "signup" */ './pages/Signup'));
+const ProfileForm = lazy(() => import(/* webpackChunkName: "profile-form" */ './pages/ProfileForm'));
+const Profile = lazy(() => import(/* webpackChunkName: "profile" */ './pages/Profile'));
+const Dashboard = lazy(() => import(/* webpackChunkName: "dashboard" */ './pages/Dashboard'));
+const ChatPage = lazy(() => import(/* webpackChunkName: "chat" */ './pages/ChatPage'));
+const ViewProfile = lazy(() => import(/* webpackChunkName: "view-profile" */ './components/ViewProfile'));
+const CompatibilityForm = lazy(() => import(/* webpackChunkName: "compatibility-form" */ './pages/CompatibilityForm'));
+const Contact = lazy(() => import(/* webpackChunkName: "contact" */ './components/Contact'));
+const Terms = lazy(() => import(/* webpackChunkName: "terms" */ './components/Terms'));
+const Privacy = lazy(() => import(/* webpackChunkName: "privacy" */ './components/Privacy'));
+const PersonalityReportDisplay = lazy(() => import(/* webpackChunkName: "personality-report-display" */ './pages/PersonalityReport'));
+const PersonalityReportPage = lazy(() => import(/* webpackChunkName: "personality-report-page" */ './pages/PersonalityReportPage'));
 
 export default function App() {
   return (
@@ -27,23 +30,25 @@ export default function App() {
 
         {/* Main Pages */}
         <main className="bg-gradient-to-b from-pink-50 to-pink-100">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/compatibilityform" element={<CompatibilityForm />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/profile" element={<Profile/>} />
-            <Route path="/profileform" element={<ProfileForm/>} />
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/chat/:userId" element={<ChatPage />} />
-            <Route path="/view-profile/:userId" element={<ViewProfile />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/personality-report" element={<PersonalityReportDisplay />} />
-            <Route path="/personality-report/:userId" element={<PersonalityReportPage />} />
-          </Routes>
+          <Suspense fallback={<div className="p-8 text-center">Loading…</div>}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/compatibilityform" element={<CompatibilityForm />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/profileform" element={<ProfileForm />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/chat/:userId" element={<ChatPage />} />
+              <Route path="/view-profile/:userId" element={<ViewProfile />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/personality-report" element={<PersonalityReportDisplay />} />
+              <Route path="/personality-report/:userId" element={<PersonalityReportPage />} />
+            </Routes>
+          </Suspense>
         </main>
 
         {/* Footer */}
