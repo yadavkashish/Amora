@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-    <!-- Preconnect important origins (keep <=4) -->
+    <!-- Optional: preconnect important origins (inject script can add these if preferred) -->
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
-    <link rel="preconnect" href="https://amora-mx7x.onrender.com" crossorigin>
     <link rel="preconnect" href="https://static.sketchfab.com" crossorigin>
-    <link rel="preconnect" href="https://grainy-gradients.vercel.app" crossorigin>
+    <link rel="preconnect" href="https://amora-mx7x.onrender.com" crossorigin>
 
-    <!-- Preload hero image + critical font -->
+    <!-- Preload hero image + critical font (keep one LCP preload) -->
     <link rel="preload" as="image" href="https://images.unsplash.com/photo-1621784563330-caee0b138a00?auto=format&fit=crop&w=1000&q=80">
     <link rel="preload" href="/fonts/Inter.woff2" as="font" type="font/woff2" crossorigin>
 
@@ -32,9 +32,8 @@
       /* minimal hero layout rules only */
     </style>
 
-    <!-- Non-blocking load for main CSS (preload -> onload switch) -->
-    <link rel="preload" href="/assets/index-DqxqBBUW.css" as="style" onload="this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/assets/index-DqxqBBUW.css"></noscript>
+    <!-- CSS_PRELOAD_PLACEHOLDER: inject-css.js will replace this with non-blocking CSS preload + modulepreload entries -->
+    <!-- CSS_PRELOAD_PLACEHOLDER -->
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="https://www.amoraonline.in/images/image.png" />
@@ -72,18 +71,13 @@
     }
     </script>
 
-    <!-- Modulepreload for main JS so it can be fetched early without blocking rendering -->
-    <link rel="modulepreload" href="/assets/index-Dp3rJu5k.js">
-
-    <!-- IMPORTANT: do not include blocking 3rd-party scripts here -->
-    <!-- Sketchfab will be loaded lazily after page load / interaction below -->
-
+    <!-- IMPORTANT: do not hardcode built hashes here; inject-css.js will add modulepreload tags for built entries -->
   </head>
 
   <body>
     <div id="root"></div>
 
-    <!-- Main app (module scripts are deferred by default) -->
+    <!-- Main app (module scripts are deferred by default; Vite will map /src/main.jsx to hashed bundles in production) -->
     <script type="module" src="/src/main.jsx"></script>
 
     <!-- Lazy-load Sketchfab after load or on first user interaction -->
