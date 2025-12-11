@@ -40,17 +40,7 @@ export default defineConfig(({ mode }) => {
           manualChunks(id) {
             if (!id) return;
             if (id.includes('node_modules')) {
-              // Put React + react-dom + router into their own chunk
-              if (
-                id.includes('/react/') ||
-                id.includes('/react-dom/') ||
-                id.includes('react-router') ||
-                id.includes('react-router-dom')
-              ) {
-                return 'vendor-react';
-              }
-
-              // Split heavy 3D / ML libs into separate chunk to keep vendor small
+              // Group heavy 3D / ML libs separately
               if (
                 id.includes('@react-three') ||
                 id.includes('three') ||
@@ -60,7 +50,7 @@ export default defineConfig(({ mode }) => {
                 return 'vendor-3d-ml';
               }
 
-              // Fallback vendor chunk for other node_modules
+              // Put everything from node_modules (including react/react-dom/router) into a single vendor chunk
               return 'vendor';
             }
           }
