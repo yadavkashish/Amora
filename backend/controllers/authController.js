@@ -38,6 +38,12 @@ const createToken = (userId) => {
 exports.sendOtp = async (req, res) => {
   try {
     const { email, descriptor } = req.body;
+    console.log("📩 sendOtp called");
+    console.log("Email:", email);
+    console.log("Descriptor type:", typeof descriptor);
+    console.log("Is array:", Array.isArray(descriptor));
+    console.log("Descriptor length:", descriptor?.length);
+
     if (!email || !descriptor) return res.status(400).json({ error: "Email and selfie descriptor are required" });
 
     // generate OTP

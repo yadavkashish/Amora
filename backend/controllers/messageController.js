@@ -1,6 +1,16 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
 
+const chat = await Chat.findOne({
+  participants: { $all: [senderId, receiverId] },
+  status: "ACCEPTED"
+});
+
+if (!chat) {
+  return res.status(403).json({ error: "Chat not accepted yet" });
+}
+
+
 // @desc    Send a message
 // @route   POST /api/messages/:receiverId
 // @access  Private

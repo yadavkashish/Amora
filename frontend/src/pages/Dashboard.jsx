@@ -17,6 +17,9 @@ import {
   Loader2,
   Search
 } from "lucide-react";
+import { sendChatRequest } from "../api/chat";
+import MatchCard from "../components/MatchCard";
+
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = `${BASE_URL}` || "http://localhost:5000";
@@ -117,131 +120,131 @@ function ErrorState({ error, onRetry }) {
 // ============================================================================
 // MATCH CARD - Professional Dark Theme
 // ============================================================================
-function MatchCard({ match, idx, onViewProfile, onMessage }) {
-  const [imageFailed, setImageFailed] = useState(false);
+// function MatchCard({ match, idx, onViewProfile, onMessage }) {
+//   const [imageFailed, setImageFailed] = useState(false);
 
-  const getCompatibilityColor = (score) => {
-    if (score >= 80) return "from-emerald-400 to-green-600";
-    if (score >= 60) return "from-blue-400 to-cyan-500";
-    return "from-amber-400 to-orange-500";
-  };
+//   const getCompatibilityColor = (score) => {
+//     if (score >= 80) return "from-emerald-400 to-green-600";
+//     if (score >= 60) return "from-blue-400 to-cyan-500";
+//     return "from-amber-400 to-orange-500";
+//   };
 
-  const compScore = Math.round(Number(match.compatibility) || 0);
-  const compGradient = getCompatibilityColor(compScore);
+//   const compScore = Math.round(Number(match.compatibility) || 0);
+//   const compGradient = getCompatibilityColor(compScore);
 
-  const getDomainName = (domain) => {
-    if (!domain) return "";
-    const name = domain.replace("@", "").split(".")[0];
-    return name.charAt(0).toUpperCase() + name.slice(1);
-  };
+//   const getDomainName = (domain) => {
+//     if (!domain) return "";
+//     const name = domain.replace("@", "").split(".")[0];
+//     return name.charAt(0).toUpperCase() + name.slice(1);
+//   };
 
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ delay: idx * 0.05, duration: 0.4 }}
-      className="group h-full"
-    >
-      <div className="relative h-full bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-pink-500/30 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-pink-500/10">
+//   return (
+//     <motion.div
+//       layout
+//       initial={{ opacity: 0, y: 20 }}
+//       animate={{ opacity: 1, y: 0 }}
+//       exit={{ opacity: 0, scale: 0.9 }}
+//       transition={{ delay: idx * 0.05, duration: 0.4 }}
+//       className="group h-full"
+//     >
+//       <div className="relative h-full bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-pink-500/30 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-pink-500/10">
         
-        {/* Image Area */}
-        <div className="relative h-72 overflow-hidden bg-zinc-900">
-          {match.profilePic && !imageFailed ? (
-            <img
-              src={match.profilePic}
-              alt={match.name}
-              onError={() => setImageFailed(true)}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center">
-              <span className="text-zinc-700 text-6xl font-black opacity-50">
-                {match.name?.charAt(0) || "?"}
-              </span>
-            </div>
-          )}
+//         {/* Image Area */}
+//         <div className="relative h-72 overflow-hidden bg-zinc-900">
+//           {match.profilePic && !imageFailed ? (
+//             <img
+//               src={match.profilePic}
+//               alt={match.name}
+//               onError={() => setImageFailed(true)}
+//               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100"
+//             />
+//           ) : (
+//             <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center">
+//               <span className="text-zinc-700 text-6xl font-black opacity-50">
+//                 {match.name?.charAt(0) || "?"}
+//               </span>
+//             </div>
+//           )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-[#05030a] via-transparent to-transparent opacity-90" />
+//           <div className="absolute inset-0 bg-gradient-to-t from-[#05030a] via-transparent to-transparent opacity-90" />
 
-          {/* Badges */}
-          <div className="absolute top-4 right-4">
-             <div className={`px-3 py-1.5 rounded-full text-xs font-bold text-black shadow-lg flex items-center gap-1.5 bg-gradient-to-r ${compGradient}`}>
-              <Flame className="w-3.5 h-3.5 fill-black/20" />
-              <span>{compScore}% Match</span>
-            </div>
-          </div>
+//           {/* Badges */}
+//           <div className="absolute top-4 right-4">
+//              <div className={`px-3 py-1.5 rounded-full text-xs font-bold text-black shadow-lg flex items-center gap-1.5 bg-gradient-to-r ${compGradient}`}>
+//               <Flame className="w-3.5 h-3.5 fill-black/20" />
+//               <span>{compScore}% Match</span>
+//             </div>
+//           </div>
 
-          {match.emailDomain && (
-            <div className="absolute top-4 left-4">
-              <div className="px-3 py-1.5 rounded-full text-xs font-semibold text-white/90 bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
-                <School className="w-3.5 h-3.5 text-blue-400" />
-                <span>{getDomainName(match.emailDomain)}</span>
-              </div>
-            </div>
-          )}
+//           {match.emailDomain && (
+//             <div className="absolute top-4 left-4">
+//               <div className="px-3 py-1.5 rounded-full text-xs font-semibold text-white/90 bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
+//                 <School className="w-3.5 h-3.5 text-blue-400" />
+//                 <span>{getDomainName(match.emailDomain)}</span>
+//               </div>
+//             </div>
+//           )}
 
-          {/* Overlay Info */}
-          <div className="absolute bottom-0 left-0 right-0 p-5">
-            <h3 className="text-2xl font-bold text-white mb-1 truncate">
-              {match.name}, <span className="text-pink-500 font-light">{match.age}</span>
-            </h3>
-            {match.location && (
-              <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-                <MapPin className="w-3.5 h-3.5" />
-                {match.location}
-              </div>
-            )}
-          </div>
-        </div>
+//           {/* Overlay Info */}
+//           <div className="absolute bottom-0 left-0 right-0 p-5">
+//             <h3 className="text-2xl font-bold text-white mb-1 truncate">
+//               {match.name}, <span className="text-pink-500 font-light">{match.age}</span>
+//             </h3>
+//             {match.location && (
+//               <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
+//                 <MapPin className="w-3.5 h-3.5" />
+//                 {match.location}
+//               </div>
+//             )}
+//           </div>
+//         </div>
 
-        {/* Content Area */}
-        <div className="p-5 flex-grow flex flex-col">
-          <p className="text-zinc-400 text-sm line-clamp-2 mb-4 leading-relaxed font-light flex-grow">
-            "{match.bio || "Just joined the community..."}"
-          </p>
+//         {/* Content Area */}
+//         <div className="p-5 flex-grow flex flex-col">
+//           <p className="text-zinc-400 text-sm line-clamp-2 mb-4 leading-relaxed font-light flex-grow">
+//             "{match.bio || "Just joined the community..."}"
+//           </p>
 
-          {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {match.gender && (
-              <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-                {match.gender}
-              </span>
-            )}
-            {match.interests?.length > 0 && (
-              <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider font-semibold text-zinc-400 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-purple-400" />
-                {match.interests.length} Interests
-              </span>
-            )}
-          </div>
+//           {/* Tags */}
+//           <div className="flex flex-wrap gap-2 mb-6">
+//             {match.gender && (
+//               <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
+//                 {match.gender}
+//               </span>
+//             )}
+//             {match.interests?.length > 0 && (
+//               <span className="px-2.5 py-1 rounded-md bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider font-semibold text-zinc-400 flex items-center gap-1">
+//                 <Sparkles className="w-3 h-3 text-purple-400" />
+//                 {match.interests.length} Interests
+//               </span>
+//             )}
+//           </div>
 
-          {/* Buttons */}
-          <div className="grid grid-cols-2 gap-3 mt-auto">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onViewProfile(match)}
-              className="py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white text-sm font-semibold shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 transition-all flex items-center justify-center gap-2"
-            >
-              <Heart className="w-4 h-4" /> Profile
-            </motion.button>
+//           {/* Buttons */}
+//           <div className="grid grid-cols-2 gap-3 mt-auto">
+//             <motion.button
+//               whileHover={{ scale: 1.02 }}
+//               whileTap={{ scale: 0.98 }}
+//               onClick={() => onViewProfile(match)}
+//               className="py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white text-sm font-semibold shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 transition-all flex items-center justify-center gap-2"
+//             >
+//               <Heart className="w-4 h-4" /> Profile
+//             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onMessage(match)}
-              className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-semibold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-            >
-              <MessageCircle className="w-4 h-4 text-blue-400" /> Chat
-            </motion.button>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
+//             <motion.button
+//               whileHover={{ scale: 1.02 }}
+//               whileTap={{ scale: 0.98 }}
+//               onClick={() => onMessage(match)}
+//               className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-semibold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+//             >
+//               <MessageCircle className="w-4 h-4 text-blue-400" /> Chat
+//             </motion.button>
+//           </div>
+//         </div>
+//       </div>
+//     </motion.div>
+//   );
+// }
 
 // ============================================================================
 // MAIN DASHBOARD COMPONENT
@@ -275,11 +278,18 @@ export default function DashboardModern() {
         const rawMatches = Array.isArray(payload) ? payload : Array.isArray(payload?.matches) ? payload.matches : payload?.data || [];
 
         const normalized = rawMatches.map((m) => ({
-          ...m,
-          compatibility: Number(m.compatibility ?? 0),
-          gender: m.gender ?? "",
-          emailDomain: m.emailDomain ?? "",
-        }));
+  ...m,
+
+  // existing fields you already rely on
+  compatibility: Number(m.compatibility ?? 0),
+  gender: m.gender ?? "",
+  emailDomain: m.emailDomain ?? "",
+
+  // new chat-request-related fields
+  chatStatus: m.chatStatus || "NONE", // NONE | REQUESTED | ACCEPTED | BLOCKED
+  chatId: m.chatId || null,
+}));
+
 
         setMatches(normalized);
         setLoading(false);
@@ -332,6 +342,23 @@ export default function DashboardModern() {
 
     setFilteredMatches(result);
   }, [matches, me, filter]);
+
+ const handleRequestChat = async (match) => {
+  try {
+    await sendChatRequest(match.userId); // ✅ userId is correct
+    
+    setMatches(prev =>
+      prev.map(m =>
+        m.userId === match.userId
+          ? { ...m, chatStatus: "REQUESTED" }
+          : m
+      )
+    );
+  } catch (err) {
+    alert(err.response?.data?.error || "Failed to send request");
+  }
+};
+
 
   // ===== HANDLERS =====
   const handleViewProfile = (match) => {
@@ -450,6 +477,7 @@ export default function DashboardModern() {
                   idx={idx}
                   onViewProfile={handleViewProfile}
                   onMessage={handleSendMessage}
+                  onRequestChat={handleRequestChat}
                 />
               ))}
             </motion.div>

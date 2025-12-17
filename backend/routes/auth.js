@@ -18,6 +18,24 @@ router.post("/verify-otp", verifyOtpAndRegister);
 router.post("/forgot-password", otpLimiter, forgotPassword);
 router.post("/reset-password", resetPassword);
 
+// GET user by ID (for View Profile)
+router.get("/user/:id", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select(
+      "name age gender bio interests profilePic emailDomain"
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+
 // Login route with limiter
 router.post("/login", loginLimiter, login);
 
