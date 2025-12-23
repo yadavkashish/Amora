@@ -7,11 +7,17 @@ import { relativeTime } from "../utils/time";
  * Adapted for Dark/Glassmorphism Theme.
  */
 export default function Chats({ users, currentUserId, selectedUserId, onSelectUser }) {
+  const getProfilePic = (pic) => {
+  if (!pic) return "https://via.placeholder.com/80";
+  if (pic.startsWith("http")) return pic;
+  return `${import.meta.env.VITE_API_URL}/${pic}`;
+};
+
   return (
-    <div className="h-full flex flex-col bg-transparent">
+    <div className="flex-1 flex flex-col bg-transparent">
       
       {/* Chat list */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pt-16">
         {users?.length === 0 ? (
           <div className="p-8 text-center flex flex-col items-center justify-center h-full text-zinc-500">
             <p>No chats yet.</p>
@@ -38,14 +44,13 @@ export default function Chats({ users, currentUserId, selectedUserId, onSelectUs
                   {/* User profile picture */}
                   <div className="relative flex-shrink-0">
                     <img
-                      src={
-                        user.profilePic && user.profilePic.startsWith("http")
-                          ? user.profilePic
-                          : "https://via.placeholder.com/80"
-                      }
-                      alt={user.name}
-                      className={`w-12 h-12 rounded-full object-cover border border-white/10 ${isSelected ? 'ring-2 ring-pink-500/30' : ''}`}
-                    />
+  src={getProfilePic(user.profilePic)}
+  alt={user.name}
+  className={`w-12 h-12 rounded-full object-cover border border-white/10 ${
+    isSelected ? "ring-2 ring-pink-500/30" : ""
+  }`}
+/>
+
                     {/* Online Status Dot (Optional placeholder) */}
                     {/* <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full"></div> */}
                   </div>

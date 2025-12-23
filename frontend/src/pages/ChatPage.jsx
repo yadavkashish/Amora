@@ -1,223 +1,256 @@
-'use client';
-
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import Chats from "../components/Chats";
-import ChatWindow from "../components/ChatWindow";
 import { getSocket } from "../utils/socket";
-import { MessageSquareDashed, Loader2, Sparkles } from "lucide-react";
+import Chats from "../components/Chats";
+import { motion } from "framer-motion";
 
-// --- SHARED UI COMPONENTS ---
-const BackgroundGrid = () => (
-  <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-[#05030a]">
-    <div
-      className="absolute inset-0"
-      style={{
-        backgroundImage: `
-          radial-gradient(circle at 10% 0%, rgba(244, 63, 94, 0.15), transparent 50%),
-          radial-gradient(circle at 90% 100%, rgba(168, 85, 247, 0.15), transparent 50%),
-          radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.1), transparent 50%)
-        `,
-      }}
-    />
-    <div className="absolute inset-0 opacity-[0.2] mix-blend-soft-light bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-  </div>
-);
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function ChatPage() {
-  const { userId } = useParams();
-  const [users, setUsers] = useState([]);
+  const [chatUsers, setChatUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const API_URL = import.meta.env.VITE_API_URL;
-  const socket = getSocket();
+  const [messages, setMessages] = useState([]);
+  const [chatMeta, setChatMeta] = useState(null); // status, initiatedBy, chatId
+  const [messageText, setMessageText] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // Handle window resize
+  const socketRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const prevMessageCountRef = useRef(0);
+  
+
+
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const fetchMe = async () => {
+      const res = await axios.get(`${API_URL}/api/auth/me`, {
+        withCredentials: true,
+      });
+      setCurrentUser(res.data.user);
+    };
+
+    fetchMe();
   }, []);
 
-  // Fetch logged-in user
+  // ================= SOCKET INIT =================
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true });
-        setCurrentUserId(res.data.user?._id || null);
-      } catch (err) {
-        console.error("Error fetching current user:", err);
+    if (!currentUser) return;
+
+    socketRef.current = getSocket();
+    socketRef.current.emit("join-room", currentUser._id);
+
+    socketRef.current.on("receive-message", (msg) => {
+      if (msg.sender === selectedUser?._id) {
+        setMessages((prev) => [...prev, msg]);
       }
+    });
+
+    socketRef.current.on("notification", () => {
+      fetchChatUsers();
+    });
+
+    return () => {
+      socketRef.current?.off("receive-message");
+      socketRef.current?.off("notification");
     };
-    fetchCurrentUser();
-  }, [API_URL]);
+  }, [currentUser, selectedUser]);
 
-  // Fetch chat list (users)
-  useEffect(() => {
-    const fetchChatList = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/messages`, { withCredentials: true });
-        setUsers(res.data);
-      } catch (err) {
-        console.error("❌ Error fetching chat list:", err);
-      }
-    };
-    fetchChatList();
-  }, [API_URL]);
-
-  // Handle direct navigation via userId param
-  useEffect(() => {
-    if (!userId) return;
-
-    const fetchUserProfile = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/profile/user/${userId}`, { withCredentials: true });
-        const profile = res.data;
-        const newUser = {
-          _id: profile.user._id,
-          name: profile.user.name,
-          profilePic: profile.profilePic,
-        };
-        setUsers(prev => prev.some(u => u._id === newUser._id) ? prev : [...prev, newUser]);
-        handleSelectUser(newUser);
-      } catch (err) {
-        console.error("Error fetching user profile:", err);
-      }
-    };
-
-    fetchUserProfile();
-  }, [userId, API_URL]);
-
-  // Join socket room
-  useEffect(() => {
-    if (!currentUserId) return;
-    socket.emit("join", String(currentUserId));
-  }, [currentUserId, socket]);
-
-  // Update chat list on new messages
-  useEffect(() => {
-    const handleNewMessage = (msg) => {
-      setUsers(prev =>
-        prev.map(u =>
-          u._id === msg.sender || u._id === msg.receiver
-            ? { ...u, lastMessage: msg.content, timestamp: msg.timestamp, unreadCount: (u.unreadCount || 0) + 1 }
-            : u
-        )
-      );
-    };
-    socket.on("newMessage", handleNewMessage);
-    return () => socket.off("newMessage", handleNewMessage);
-  }, [socket]);
-
-  // Handle selecting a chat
-  const handleSelectUser = async (user) => {
-    setSelectedUser(user);
-    try {
-      await axios.put(`${API_URL}/api/messages/seen/${user._id}`, {}, { withCredentials: true });
-      setUsers(prev =>
-        prev.map(u =>
-          u._id === user._id ? { ...u, unreadCount: 0 } : u
-        )
-      );
-    } catch (err) {
-      console.error("❌ Error marking messages as read:", err);
-    }
+  // ================= FETCH CHAT LIST =================
+  const fetchChatUsers = async () => {
+    const res = await axios.get(`${API_URL}/api/chat`, {
+      withCredentials: true,
+    });
+    setChatUsers(res.data);
   };
 
+  // ================= FETCH MESSAGES =================
+  const fetchMessages = async (user) => {
+  setSelectedUser(user);
+  // IMPORTANT: reset scroll memory BEFORE clearing
+prevMessageCountRef.current = 0;
+  setMessages([]);
+
+  const metaRes = await axios.get(
+    `${API_URL}/api/chat/meta/${user._id}`,
+    { withCredentials: true }
+  );
+
+  console.log("🧠 CHAT META:", metaRes.data);
+  setChatMeta(metaRes.data);
+
+  if (metaRes.data?.status === "ACCEPTED") {
+    const msgRes = await axios.get(
+      `${API_URL}/api/messages/${user._id}`,
+      { withCredentials: true }
+    );
+    setMessages(msgRes.data);
+  }
+};
+
+
+  useEffect(() => {
+    fetchChatUsers();
+  }, []);
+
+  useEffect(() => {
+  // Only scroll if a new message was ADDED
+  if (messages.length > prevMessageCountRef.current) {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  prevMessageCountRef.current = messages.length;
+}, [messages]);
+
+
+  // ================= ACTIONS =================
+
+  const sendMessage = async () => {
+    if (!messageText.trim()) return;
+
+    const res = await axios.post(
+      `${API_URL}/api/messages/${selectedUser._id}`,
+      { content: messageText },
+      { withCredentials: true }
+    );
+
+    socketRef.current.emit("send-message", {
+      receiverId: selectedUser._id,
+      ...res.data,
+    });
+
+    setMessages((prev) => [...prev, res.data]);
+    setMessageText("");
+  };
+
+  const acceptRequest = async () => {
+    await axios.put(
+      `${API_URL}/api/chat/${chatMeta.chatId}/accept`,
+      {},
+      { withCredentials: true }
+    );
+    setChatMeta({ ...chatMeta, status: "ACCEPTED" });
+    fetchMessages(selectedUser);
+  };
+
+  const blockUser = async () => {
+    await axios.put(
+      `${API_URL}/api/chat/${chatMeta.chatId}/block`,
+      {},
+      { withCredentials: true }
+    );
+    setSelectedUser(null);
+    fetchChatUsers();
+  };
+
+  // ================= RENDER =================
+
+  if (!currentUser) {
+    return (
+      <div className="h-screen flex items-center justify-center text-zinc-400">
+        Loading chats...
+      </div>
+    );
+  }
+
+  const handleKeyDown = (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault(); // stop new line
+    sendMessage();
+  }
+};
+
+
   return (
-    <div className="relative h-screen w-full bg-[#05030a] text-slate-200 overflow-hidden pt-20">
-      <BackgroundGrid />
+    <div className="h-screen pl-80 pr-80 pt-14 flex bg-[#05030a] text-white overflow-hidden">
+      {/* LEFT SIDEBAR */}
+      <div className="w-[360px] border-r border-white/10">
+        <Chats
+          users={chatUsers}
+          currentUserId={currentUser._id}
+          selectedUserId={selectedUser?._id}
+          onSelectUser={fetchMessages}
+        />
+      </div>
 
-      {/* Main Container */}
-      <div className="h-[calc(100vh-90px)] max-w-[1600px] mx-auto p-4 md:p-6">
-        <div className="flex h-full w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl">
-          
-          {/* Desktop Layout */}
-          {!isMobile && (
-            <>
-              {/* Sidebar */}
-              <aside className="w-80 md:w-96 border-r border-white/10 bg-white/5 flex flex-col">
-                <div className="p-5 border-b border-white/10 bg-black/20">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <MessageSquareDashed className="text-pink-500" /> Messages
-                    </h2>
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  <Chats
-                    users={users}
-                    currentUserId={currentUserId}
-                    selectedUserId={selectedUser?._id}
-                    onSelectUser={handleSelectUser}
-                  />
-                </div>
-              </aside>
+      {/* RIGHT CHAT PANEL */}
+      <div className="flex-1 flex flex-col relative">
+        {!selectedUser ? (
+          <div className="flex-1 flex items-center justify-center text-zinc-500">
+            Select a chat to start messaging
+          </div>
+        ) : (
+          <>
+            {/* HEADER */}
+            <div className="px-6 py-4 border-b border-white/10 font-semibold">
+              {selectedUser.name}
+            </div>
 
-              {/* Main Chat Area */}
-              <main className="flex-1 flex flex-col bg-transparent relative">
-                {currentUserId === null ? (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-zinc-500">
-                    <Loader2 className="w-10 h-10 animate-spin text-pink-500" />
-                    <p>Syncing messages...</p>
+            {/* REQUEST BANNER */}
+            {chatMeta?.status === "REQUESTED" &&
+ chatMeta.initiatedBy !== currentUser._id.toString() && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="m-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30"
+                >
+                  <p className="text-yellow-300 text-sm mb-3">
+                    This user wants to chat with you
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={acceptRequest}
+                      className="px-4 py-2 bg-green-500 rounded-lg font-semibold"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={blockUser}
+                      className="px-4 py-2 bg-red-500 rounded-lg font-semibold"
+                    >
+                      Block
+                    </button>
                   </div>
-                ) : selectedUser ? (
-                  <ChatWindow
-                    selectedUser={selectedUser}
-                    currentUserId={currentUserId}
-                    API_URL={API_URL}
-                  />
-                ) : (
-                  // Empty State for Desktop
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                    <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(236,72,153,0.15)] border border-white/5">
-                        <Sparkles className="w-10 h-10 text-pink-400" />
-                    </div>
-                    <h3 className="text-3xl font-bold text-white mb-2">Pick a Conversation</h3>
-                    <p className="text-zinc-400 max-w-sm">
-                        Select a match from the sidebar to start chatting or connecting with your campus peers.
-                    </p>
-                  </div>
-                )}
-              </main>
-            </>
-          )}
-
-          {/* Mobile Layout */}
-          {isMobile && (
-            <main className="flex-1 flex flex-col w-full bg-transparent">
-              {currentUserId === null ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-zinc-500">
-                    <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
-                    <p>Loading...</p>
-                </div>
-              ) : selectedUser ? (
-                <ChatWindow
-                  selectedUser={selectedUser}
-                  currentUserId={currentUserId}
-                  API_URL={API_URL}
-                  onBack={() => setSelectedUser(null)}
-                />
-              ) : (
-                <div className="flex flex-col h-full">
-                    <div className="p-4 border-b border-white/10 bg-black/20">
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                            Messages
-                        </h2>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                        <Chats
-                            users={users}
-                            currentUserId={currentUserId}
-                            selectedUserId={selectedUser?._id}
-                            onSelectUser={handleSelectUser}
-                        />
-                    </div>
-                </div>
+                </motion.div>
               )}
-            </main>
-          )}
-        </div>
+
+            {/* MESSAGES */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg._id}
+                  className={`max-w-[70%] px-4 py-2 rounded-xl ${
+                    msg.sender === currentUser._id
+                      ? "ml-auto bg-pink-500 text-white"
+                      : "bg-white/10"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* INPUT */}
+            {chatMeta?.status === "ACCEPTED" && (
+              <div className="p-4 border-t border-white/10 flex gap-3">
+                <input
+  value={messageText}
+  onChange={(e) => setMessageText(e.target.value)}
+  onKeyDown={handleKeyDown}
+  placeholder="Type a message..."
+  className="flex-1 bg-white/5 px-4 py-2 rounded-xl outline-none"
+/>
+
+                <button
+                type="button"
+                  onClick={sendMessage}
+                  className="px-5 py-2 bg-pink-500 rounded-xl font-semibold"
+                >
+                  Send
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

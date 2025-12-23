@@ -1,145 +1,197 @@
 "use client";
 
 import { motion } from "framer-motion";
+import {
+  Flame,
+  Heart,
+  MessageCircle,
+  Sparkles,
+  School,
+  MapPin,
+} from "lucide-react";
+import { useState } from "react";
 
-export default function MatchCard({ match, onMessage, onViewProfile }) {
-  // Helper: Get color based on compatibility score
-  const getCompatibilityColor = (score) => {
-    if (score >= 85) return 'bg-green-500';
-    if (score >= 75) return 'bg-blue-500';
-    if (score >= 65) return 'bg-yellow-500';
-    if (score >= 55) return 'bg-orange-500';
-    return 'bg-red-500';
+export default function MatchCard({
+  match,
+  onViewProfile,
+  onMessage,
+  onRequestChat,
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  // ================= HELPERS =================
+
+  const getCompatibilityGradient = (score) => {
+    if (score >= 80) return "from-emerald-400 to-green-600";
+    if (score >= 60) return "from-blue-400 to-cyan-500";
+    return "from-amber-400 to-orange-500";
   };
 
-  // Helper: Get emoji based on compatibility
-  const getCompatibilityEmoji = (score) => {
-    if (score >= 85) return '🔥';
-    if (score >= 75) return '💚';
-    if (score >= 65) return '👍';
-    if (score >= 55) return '🤔';
-    return '❓';
+  const getDomainName = (domain) => {
+    if (!domain) return "";
+    const name = domain.replace("@", "").split(".")[0];
+    return name.charAt(0).toUpperCase() + name.slice(1);
   };
 
-  // Helper: Get text color for compatibility
-  const getTextColor = (score) => {
-    if (score >= 85) return 'text-green-600';
-    if (score >= 75) return 'text-blue-600';
-    if (score >= 65) return 'text-yellow-600';
-    if (score >= 55) return 'text-orange-600';
-    return 'text-red-600';
+  const compScore = Math.round(Number(match.compatibility) || 0);
+  const compGradient = getCompatibilityGradient(compScore);
+
+  // ================= CHAT BUTTON =================
+
+  const renderChatButton = () => {
+    switch (match.chatStatus) {
+      case "NONE":
+        return (
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onRequestChat(match)}
+            className="py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white text-sm font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            💌 Request Chat
+          </motion.button>
+        );
+
+      case "REQUESTED":
+        return (
+          <button
+            disabled
+            className="py-2.5 rounded-xl bg-white/10 text-zinc-400 text-sm font-semibold cursor-not-allowed"
+          >
+            ⏳ Pending
+          </button>
+        );
+
+      case "ACCEPTED":
+        return (
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onMessage(match)}
+            className="py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-black text-sm font-semibold shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            <MessageCircle className="w-4 h-4" /> Chat
+          </motion.button>
+        );
+
+      case "BLOCKED":
+        return (
+          <button
+            disabled
+            className="py-2.5 rounded-xl bg-red-500/20 text-red-400 text-sm font-semibold cursor-not-allowed"
+          >
+            🚫 Blocked
+          </button>
+        );
+
+      default:
+        return null;
+    }
   };
+
+  // ================= RENDER =================
 
   return (
     <motion.div
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.98 }}
-      className="w-full max-w-sm bg-white shadow-lg rounded-2xl overflow-hidden relative transition duration-300 cursor-pointer"
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="group h-full"
     >
-      {/* ===== COMPATIBILITY BADGE ===== */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        className={`absolute top-3 right-3 ${getCompatibilityColor(match.compatibility)} text-white px-3 py-2 rounded-full shadow-lg z-10`}
-      >
-        <div className="text-center">
-          <div className="text-lg font-bold">{match.compatibility}%</div>
-          <div className="text-xs font-semibold">{match.category}</div>
-          <div className="text-xl mt-1">{getCompatibilityEmoji(match.compatibility)}</div>
+      <div className="relative h-full bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-pink-500/30 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-pink-500/10">
+
+        {/* IMAGE */}
+        <div className="relative h-72 overflow-hidden bg-zinc-900">
+          {match.profilePic && !imageFailed ? (
+            <img
+              src={match.profilePic}
+              alt={match.name}
+              onError={() => setImageFailed(true)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+              <span className="text-zinc-700 text-6xl font-black">
+                {match.name?.charAt(0) || "?"}
+              </span>
+            </div>
+          )}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-[#05030a] via-transparent to-transparent" />
+
+          {/* MATCH BADGE */}
+          <div className="absolute top-4 right-4">
+            <div
+              className={`px-3 py-1.5 rounded-full text-xs font-bold text-black shadow-lg flex items-center gap-1.5 bg-gradient-to-r ${compGradient}`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              {compScore}% Match
+            </div>
+          </div>
+
+          {/* DOMAIN */}
+          {match.emailDomain && (
+            <div className="absolute top-4 left-4">
+              <div className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
+                <School className="w-3.5 h-3.5 text-blue-400" />
+                {getDomainName(match.emailDomain)}
+              </div>
+            </div>
+          )}
+
+          {/* NAME */}
+          <div className="absolute bottom-0 left-0 right-0 p-5">
+            <h3 className="text-2xl font-bold text-white">
+              {match.name},{" "}
+              <span className="text-pink-500 font-light">
+                {match.age}
+              </span>
+            </h3>
+            {match.location && (
+              <div className="flex items-center gap-1.5 text-zinc-400 text-xs">
+                <MapPin className="w-3.5 h-3.5" />
+                {match.location}
+              </div>
+            )}
+          </div>
         </div>
-      </motion.div>
 
-      {/* ===== PROFILE PICTURE ===== */}
-      <motion.div
-        className="relative w-full h-44 bg-gray-200 overflow-hidden"
-      >
-        <img
-          src={match.profilePic || '/default-avatar.png'}
-          alt={match.name}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.target.src = '/default-avatar.png';
-          }}
-        />
-        
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
-      </motion.div>
+        {/* CONTENT */}
+        <div className="p-5 flex flex-col flex-grow">
+          <p className="text-zinc-400 text-sm mb-4 line-clamp-2">
+            "{match.bio || "Just joined the community..."}"
+          </p>
 
-      {/* ===== CARD CONTENT ===== */}
-      <div className="p-4">
-        {/* Name and Age */}
-        <motion.h3
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="text-xl font-bold text-gray-800 mb-1"
-        >
-          {match.name}, {match.age}
-        </motion.h3>
+          {/* TAGS */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {match.gender && (
+              <span className="px-2.5 py-1 rounded-md bg-white/5 text-[10px] uppercase text-zinc-400">
+                {match.gender}
+              </span>
+            )}
+            {match.interests?.length > 0 && (
+              <span className="px-2.5 py-1 rounded-md bg-white/5 text-[10px] uppercase text-zinc-400 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-purple-400" />
+                {match.interests.length} Interests
+              </span>
+            )}
+          </div>
 
-        {/* Bio */}
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="text-sm text-gray-600 mb-2 line-clamp-2 h-10"
-        >
-          {match.bio || 'No bio provided'}
-        </motion.p>
+          {/* ACTIONS */}
+          <div className="grid grid-cols-2 gap-3 mt-auto">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onViewProfile(match)}
+              className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-semibold hover:bg-white/10 flex items-center justify-center gap-2"
+            >
+              <Heart className="w-4 h-4" /> Profile
+            </motion.button>
 
-        {/* Compatibility Interpretation */}
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className={`text-xs italic mb-3 line-clamp-2 ${getTextColor(match.compatibility)}`}
-        >
-          💭 "{match.interpretation}"
-        </motion.p>
-
-        {/* Strengths/Alignment */}
-        {match.strengths && match.strengths.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="mb-3 p-2 bg-green-50 rounded border border-green-200"
-          >
-            <p className="text-xs font-semibold text-green-800 mb-1">✨ You align on:</p>
-            <ul className="text-xs text-green-700 space-y-1">
-              {match.strengths.slice(0, 2).map((strength, idx) => (
-                <li key={idx}>• {strength}</li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
-
-        {/* Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="flex gap-2"
-        >
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onMessage(match)}
-            className="flex-1 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white px-3 py-2 rounded-lg transition font-semibold text-sm shadow-md"
-          >
-            💬 Chat
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onViewProfile(match)}
-            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-2 rounded-lg transition font-semibold text-sm shadow-md"
-          >
-            👁️ View
-          </motion.button>
-        </motion.div>
+            {renderChatButton()}
+          </div>
+        </div>
       </div>
     </motion.div>
   );

@@ -1,11 +1,18 @@
-// models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
     password: { type: String, required: true },
 
     gender: {
@@ -14,41 +21,43 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Extracted email domain for filtering (e.g., "@college.edu")
+    // derived automatically
     emailDomain: {
       type: String,
       required: true,
+      index: true,
     },
 
-    // encrypted signup selfie descriptor (AES-GCM object: { iv, tag, data })
     signupSelfieEncrypted: { type: Object, default: null },
-
-    // encrypted descriptor of the latest VERIFIED profile picture
     profileDescriptorEncrypted: { type: Object, default: null },
-
-    // set true when profile photo matches signup selfie / verified profile photo
     profileVerified: { type: Boolean, default: false },
-
-    // optional: profile picture url stored at Profile model but also can be in user
     profilePicURL: { type: String, default: null },
+    blockedUsers: [
+  { type: mongoose.Schema.Types.ObjectId, ref: "User" }
+],
+
   },
   { timestamps: true }
 );
 
-// Extract domain before saving and hash password
+/**
+ * ✅ Extract email domain BEFORE validation
+ */
+userSchema.pre("validate", function (next) {
+  if (this.email && !this.emailDomain) {
+    this.emailDomain = this.email.split("@")[1].toLowerCase();
+  }
+  next();
+});
+
+/**
+ * ✅ Hash password BEFORE save
+ */
 userSchema.pre("save", async function (next) {
   try {
-    // Extract domain from email if email is modified or new
-    if (this.isModified("email") || this.isNew) {
-      const domain = this.email.substring(this.email.lastIndexOf("@"));
-      this.emailDomain = domain.toLowerCase();
-    }
-
-    // Hash password if modified
     if (this.isModified("password")) {
       this.password = await bcrypt.hash(this.password, 10);
     }
-
     next();
   } catch (err) {
     next(err);
