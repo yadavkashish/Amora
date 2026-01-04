@@ -2,91 +2,79 @@ const router = require("express").Router();
 const { protect } = require("../middleware/auth");
 const Order = require("../models/Order");
 const User = require("../models/User");
-router.post("/create-order", protect, async (req, res) => {
-  try {
-    const { planType } = req.body; // "monthly" or "yearly"
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
 
-    if (!["monthly", "yearly"].includes(planType)) {
-      return res.status(400).json({ error: "Invalid plan type" });
-    }
-
-    const basePrice = planType === "monthly" ? 49 : 299;
-
-    // unique decimal (.01–.99) to identify UPI payments
-    const randomDecimal = (Math.floor(Math.random() * 99) + 1) / 100;
-    const finalAmount = Number((basePrice + randomDecimal).toFixed(2));
-
-    const newOrder = new Order({
-      userId: req.user._id,
-      planType,
-      finalAmount,
-      status: "PENDING",
-    });
-
-    await newOrder.save();
-
-    res.json({
-      success: true,
-      amount: finalAmount,
-      orderId: newOrder._id,
-    });
-  } catch (err) {
-    console.error("❌ Payment order error:", err);
-    res.status(500).json({ error: "Failed to create order" });
-  }
+// --- WHATSAPP BOT INITIALIZATION ---
+const client = new Client({
+    authStrategy: new LocalAuth(), // Persists login so you don't scan QR every time
+    puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
 });
 
-// ⚠️ IMPORTANT: Use a Secret Key so random people can't trigger this!
-const WEBHOOK_SECRET = process.env.PAYMENT_WEBHOOK_SECRET;
+client.on('qr', (qr) => {
+    console.log('SCAN THIS QR CODE WITH WHATSAPP:');
+    qrcode.generate(qr, { small: true });
+});
 
-router.post("/sms-confirm", async (req, res) => {
-  try {
-    const { message, secret } = req.body;
+client.on('ready', () => console.log('✅ WhatsApp Bot is Ready!'));
 
-    // Validate the request source
-    if (secret !== WEBHOOK_SECRET) {
-      return res.status(401).json({ error: "Unauthorized source" });
+// --- AUTOMATED PAYMENT VERIFICATION VIA WHATSAPP ---
+client.on('message', async (msg) => {
+    try {
+        // Regex to find decimal amounts (e.g., 49.83) in the WhatsApp message
+        const amountMatch = msg.body.match(/(\d+\.\d{2})/);
+        
+        if (amountMatch) {
+            const amount = parseFloat(amountMatch[1]);
+            const order = await Order.findOne({ finalAmount: amount, status: "PENDING" });
+
+            if (order) {
+                // 1. Mark Order as PAID
+                order.status = "PAID";
+                await order.save();
+
+                // 2. Update User to Premium
+                const days = order.planType === "yearly" ? 365 : 30;
+                await User.findByIdAndUpdate(order.userId, {
+                    isPremium: true,
+                    subscriptionType: order.planType,
+                    subscriptionExpiry: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+                });
+
+                // 3. Optional: Reply to user on WhatsApp
+                msg.reply("🎉 Payment Verified! Your Premium features are now unlocked. Go back to the app!");
+                console.log(`✅ Automated WhatsApp Unlock: ₹${amount} for User ${order.userId}`);
+            }
+        }
+    } catch (err) {
+        console.error("WhatsApp Verification Error:", err);
     }
+});
 
-    // Regex to find the amount in your Bank SMS. 
-    // Example SMS: "A/c XX123 Credited for INR 49.12 via UPI..."
-    const amountMatch = message.match(/(?:INR|Rs\.?|₹)\s?(\d+\.\d{2})/i);
-    
-    if (amountMatch) {
-      const receivedAmount = parseFloat(amountMatch[1]);
+client.initialize();
 
-      // 1. Find the PENDING order with this EXACT unique decimal
-      const order = await Order.findOne({ 
-        finalAmount: receivedAmount, 
-        status: "PENDING" 
-      });
+// --- EXISTING CREATE ORDER ROUTE ---
+router.post("/create-order", protect, async (req, res) => {
+    try {
+        const { planType } = req.body;
+        if (!["monthly", "yearly"].includes(planType)) return res.status(400).json({ error: "Invalid plan" });
 
-      if (order) {
-        // 2. Mark Order as PAID
-        order.status = "PAID";
-        await order.save();
+        const basePrice = planType === "monthly" ? 49 : 299;
+        const randomDecimal = (Math.floor(Math.random() * 99) + 1) / 100;
+        const finalAmount = Number((basePrice + randomDecimal).toFixed(2));
 
-        // 3. Update the User to Premium
-        const days = order.planType === "yearly" ? 365 : 30;
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + days);
-
-        await User.findByIdAndUpdate(order.userId, {
-          isPremium: true,
-          subscriptionType: order.planType,
-          subscriptionExpiry: expiryDate,
+        const newOrder = new Order({
+            userId: req.user._id,
+            planType,
+            finalAmount,
+            status: "PENDING",
         });
 
-        console.log(`✅ Payment Verified: ₹${receivedAmount} for User ${order.userId}`);
-        return res.status(200).send("Verified");
-      }
+        await newOrder.save();
+        res.json({ success: true, amount: finalAmount, orderId: newOrder._id });
+    } catch (err) {
+        res.status(500).json({ error: "Order failed" });
     }
-    
-    res.status(404).send("No matching order found");
-  } catch (err) {
-    console.error("❌ Webhook Error:", err);
-    res.status(500).send("Server Error");
-  }
 });
 
 module.exports = router;
