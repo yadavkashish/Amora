@@ -9,12 +9,24 @@ export default function PaymentPage() {
 const BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = BASE_URL ;
 
-  const handleProceed = async () => {
-    const res = await axios.post(`${API_URL}/api/payment/create-order`, { planType: selectedPlan }, { withCredentials: true });
-    setPaymentAmount(res.data.amount);
-    // Redirect to WhatsApp or show UPI QR here
-    window.location.href = `https://wa.me/919559167131?text=I want to pay ${res.data.amount} for ${selectedPlan} subscription.`;
-  };
+ const handleProceed = async () => {
+  try {
+    const res = await axios.post(
+      `${API_URL}/api/payment/create-order`,
+      { planType: selectedPlan },
+      { withCredentials: true }
+    );
+
+    const phone = "919559167131";
+    const message = `I want to pay ₹${res.data.amount} for ${selectedPlan} subscription. Order ID: ${res.data.orderId}`;
+
+    window.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  } catch (err) {
+    console.error("Payment init failed", err);
+    alert("Something went wrong. Please try again.");
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-[#05030a] flex items-center justify-center p-6">
