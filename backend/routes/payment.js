@@ -52,6 +52,9 @@ client.on('message', async (msg) => {
 });
 
 client.initialize();
+router.get("/test", (req, res) => {
+    res.json({ message: "Payment API is working!", timestamp: new Date() });
+});
 
 // --- EXISTING CREATE ORDER ROUTE ---
 router.post("/create-order", protect, async (req, res) => {
