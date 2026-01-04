@@ -13,7 +13,7 @@ const API_URL = BASE_URL || "http://localhost:5000";
     const res = await axios.post(`${API_URL}/api/payment/create-order`, { planType: selectedPlan }, { withCredentials: true });
     setPaymentAmount(res.data.amount);
     // Redirect to WhatsApp or show UPI QR here
-    window.location.href = `https://wa.me/91XXXXXXXXXX?text=I want to pay ${res.data.amount} for ${selectedPlan} subscription.`;
+    window.location.href = `https://wa.me/919559167131?text=I want to pay ${res.data.amount} for ${selectedPlan} subscription.`;
   };
 
   return (
