@@ -7,7 +7,7 @@ export default function PaymentPage() {
   const [selectedPlan, setSelectedPlan] = useState("monthly");
   const [paymentAmount, setPaymentAmount] = useState(null);
 const BASE_URL = import.meta.env.VITE_API_URL;
-const API_URL = BASE_URL || "http://localhost:5000";
+const API_URL = BASE_URL ;
 
   const handleProceed = async () => {
     const res = await axios.post(`${API_URL}/api/payment/create-order`, { planType: selectedPlan }, { withCredentials: true });
