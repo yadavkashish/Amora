@@ -15,6 +15,7 @@ const profileRoutes = require('./routes/profile');
 const authRoutes = require('./routes/auth');
 const messageRoutes = require('./routes/messages');
 const chatRoutes = require('./routes/chat');
+const paymentRoutes = require('./routes/payment')
 
 const app = express();
 const server = http.createServer(app);
@@ -93,7 +94,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/chat', chatRoutes);
 app.use("/api/compatibility", compatibilityRoutes);
 app.use("/api/personality", personalityRoutes);
-
+app.use('/api/payment' , paymentRoutes);
 // Mongo + start server
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;

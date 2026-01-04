@@ -99,7 +99,7 @@ export default function Header() {
             </GlassButton>
           </Link>
           <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
-            <GlassButton variant="primary" className={isMobile ? "w-full justify-center" : ""}>
+            <GlassButton variant="ghost" className={isMobile ? "w-full justify-center" : ""}>
               Sign Up
             </GlassButton>
           </Link>

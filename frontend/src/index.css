@@ -9,20 +9,6 @@
   height: 100%;
   width: 100%;
 
-  /* color-scheme: light dark; */
-  /* color: rgba(255, 255, 255, 0.87); */
-
-  /* Background image + fallback color */
-  background-color: black;
-  background-image: url('/images/bg5.jpg'); /* replace with your image path */
-  background-size: cover; /* cover entire screen */
-  background-position: center;
-  background-repeat: no-repeat;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 body {

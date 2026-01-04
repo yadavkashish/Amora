@@ -471,15 +471,17 @@ export default function DashboardModern() {
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-20"
             >
               {filteredMatches.map((match, idx) => (
-                <MatchCard
-                  key={match.userId}
-                  match={match}
-                  idx={idx}
-                  onViewProfile={handleViewProfile}
-                  onMessage={handleSendMessage}
-                  onRequestChat={handleRequestChat}
-                />
-              ))}
+  <MatchCard
+    key={match.userId}
+    match={match}
+    idx={idx}
+    isLocked={!me?.isPremium && match.isLocked}
+    onViewProfile={handleViewProfile}
+    onMessage={handleSendMessage}
+    onRequestChat={handleRequestChat}
+  />
+))}
+
             </motion.div>
           ) : (
             <motion.div 

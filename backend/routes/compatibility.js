@@ -19,6 +19,15 @@ function normalizeGender(gender) {
   return normalized;
 }
 
+function isUserPremium(user) {
+  return (
+    user?.isPremium &&
+    user?.subscriptionExpiry &&
+    new Date(user.subscriptionExpiry) > new Date()
+  );
+}
+
+
 // ============================================================================
 // HELPER: Get opposite gender filter query
 // ============================================================================
@@ -238,6 +247,8 @@ router.get("/all-matches", protect, async (req, res) => {
 
     // Step 1: Get current user details (need gender & emailDomain)
     const currentUser = await User.findById(userId);
+    const premiumUser = isUserPremium(currentUser);
+
     if (!currentUser) {
       console.error("❌ Current user not found:", userId);
       return res.status(404).json({ error: "User not found" });
@@ -391,28 +402,33 @@ router.get("/all-matches", protect, async (req, res) => {
           const { profile } = match;
           const userId = match.userId._id || match.userId;
 
-          return {
-            userId: userId.toString(),
-            name: profile.name || "Unknown User",
-            age: profile.age || null,
-            gender: profile.gender || null,
-            bio: profile.bio || "",
-            profilePic: profile.profilePic || null,
-            interests: profile.interests || [],
-            branch: profile.branch || null,
-            course: profile.course || null,
-            year: profile.year || null,
-            location: profile.location || null,
-            preference: profile.preference || "Any",
-            emailDomain: match.userId.emailDomain || null, // ✅ Include domain
-            compatibility: Math.round(match.compatibility) || 0,
-            category: matcher.categorizeMatch
-              ? matcher.categorizeMatch(match.compatibility)
-              : "Unknown",
-            interpretation: match.interpretation || "Compatible match",
-            strengths: (match.details?.strengthAreas || []).slice(0, 2),
-            challenges: (match.details?.challengeAreas || []).slice(0, 2),
-          };
+        return {
+  userId: userId.toString(),
+  name: profile.name || "Unknown User",
+  age: profile.age || null,
+  gender: profile.gender || null,
+  bio: profile.bio || "",
+  profilePic: profile.profilePic || null,
+  interests: profile.interests || [],
+  branch: profile.branch || null,
+  course: profile.course || null,
+  year: profile.year || null,
+  location: profile.location || null,
+  preference: profile.preference || "Any",
+  emailDomain: match.userId.emailDomain || null,
+  compatibility: Math.round(match.compatibility) || 0,
+  category: matcher.categorizeMatch
+    ? matcher.categorizeMatch(match.compatibility)
+    : "Unknown",
+  interpretation: match.interpretation || "Compatible match",
+  strengths: (match.details?.strengthAreas || []).slice(0, 2),
+  challenges: (match.details?.challengeAreas || []).slice(0, 2),
+
+  // 🔒 ADD THIS
+  isLocked: !premiumUser && idx >= 2,
+};
+
+
         } catch (e) {
           console.error(`❌ Error formatting match #${idx}`, e);
           return null;
@@ -430,6 +446,7 @@ router.get("/all-matches", protect, async (req, res) => {
 
     res.json({
       success: true,
+      isPremium: premiumUser,
       matches: topMatches,
       total: topMatches.length,
       userGender: currentUser.gender,

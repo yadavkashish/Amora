@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import Header from './components/Header';
 import Footer from './components/Footer';
-
+import PaymentPage from './pages/PaymentPage';
 // Lazy (split into separate chunks)
 const Login = lazy(() => import(/* webpackChunkName: "login" */ './pages/Login'));
 const Signup = lazy(() => import(/* webpackChunkName: "signup" */ './pages/Signup'));
@@ -47,12 +47,12 @@ export default function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/personality-report" element={<PersonalityReportDisplay />} />
               <Route path="/personality-report/:userId" element={<PersonalityReportPage />} />
+              <Route path="/premium" element={< PaymentPage/>} />
             </Routes>
           </Suspense>
         </main>
 
-        {/* Footer */}
-        <Footer />
+        
       </div>
     </Router>
   );
