@@ -6,21 +6,22 @@ const Order = require("../models/Order");
 router.post("/create-order", protect, async (req, res) => {
   try {
     const { planType } = req.body;
-
-    const basePrice = planType === "monthly" ? 49 : 299;
-    const randomPaise = (Math.floor(Math.random() * 99) + 1) / 100;
-    const finalAmount = Number((basePrice + randomPaise).toFixed(2));
+    
+    // Generate a unique 6-digit code for this specific payment session
+    const shortId = Math.floor(100000 + Math.random() * 900000).toString();
 
     const order = await Order.create({
       userId: req.user._id,
       planType,
-      finalAmount,
+      finalAmount: planType === "monthly" ? 49 : 299,
+      shortId: shortId // Add this to your Order Model
     });
 
     res.json({
       success: true,
       orderId: order._id,
-      amount: finalAmount,
+      shortId: shortId,
+      amount: order.finalAmount,
     });
   } catch (err) {
     res.status(500).json({ error: "Order creation failed" });

@@ -28,30 +28,16 @@ export default function PaymentPage() {
 
    // PaymentPage.jsx
 const handleProceed = async () => {
-  try {
-    const res = await axios.post(
-      `${API_URL}/api/payment/create-order`,
-      { planType: selectedPlan },
-      { withCredentials: true }
-    );
-
-    setPaymentAmount(res.data.amount);
-    setIsWaiting(true);
-
-    const phone = "919559167131";
-    const message = `
+  const res = await axios.post(`${API_URL}/api/payment/create-order`, { planType: selectedPlan });
+  
+  const message = `
 I want to pay ₹${res.data.amount}
 Plan: ${selectedPlan}
 Order ID: ${res.data.orderId}
-    `.trim();
+[Code: ${res.data.shortId}]
+  `.trim();
 
-    window.open(
-      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-      "_blank"
-    );
-  } catch {
-    alert("Payment initialization failed");
-  }
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
 };
 
 

@@ -5,7 +5,10 @@ const User = require("../models/User");
 
 const client = new Client({
   authStrategy: new LocalAuth(),
-  puppeteer: { args: ["--no-sandbox"] },
+  puppeteer: { 
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true 
+  },
 });
 
 client.on("qr", (qr) => {
@@ -20,80 +23,62 @@ client.on("ready", () => {
 client.on("message", async (msg) => {
   try {
     const body = msg.body || "";
-    const phone = msg.from; // 91xxxxxxxx@c.us
+    const phone = msg.from;
 
-    // -------------------------------
-    // STEP 1: USER OPENS PAYMENT CHAT
-    // -------------------------------
+    // --- STEP 1: BINDING & INSTRUCTIONS ---
     if (body.includes("Order ID")) {
-      const orderIdMatch = body.match(/Order ID:\s*([a-f0-9]{24})/i);
-      if (!orderIdMatch) return;
+      const codeMatch = body.match(/\[Code:\s*(\d{6})\]/);
+      if (!codeMatch) return;
 
-      const orderId = orderIdMatch[1];
+      const shortId = codeMatch[1];
+      await Order.findOneAndUpdate({ shortId }, { phone });
 
-      await Order.findByIdAndUpdate(orderId, {
-        phone,
-      });
-
-      await msg.reply(`
-✅ PAYMENT INSTRUCTIONS
-
-• Pay using *WhatsApp Pay only*
-• Enter the exact amount
-• Do NOT use GPay / PhonePe
-
-Once payment is done, premium will unlock automatically.
-`);
-      return;
+      return msg.reply("✅ Order Linked. Please complete the WhatsApp Pay payment of ₹49 now.");
     }
 
-    // ------------------------------------
-    // STEP 2: DETECT WHATSAPP PAY RECEIPT
-    // ------------------------------------
-    const isReceipt =
-      body.includes("Paid ₹") ||
-      body.includes("paid to") ||
-      body.includes("Completed") ||
-      body.includes("₹") && body.includes("paid") ||
-      body.includes("का भुगतान");
+    // --- STEP 2: PAYMENT DETECTION ---
+    const isPayment = /Completed|Sent to|Paid ₹|भुगतान/i.test(body) && body.includes("₹");
+    
+    if (isPayment) {
+      console.log(`Checking payment from ${phone}...`);
 
-    if (!isReceipt) return;
+      // Look back through the last 10 messages to find the verification code
+      const chat = await msg.getChat();
+      const history = await chat.fetchMessages({ limit: 10 });
+      
+      let foundShortId = null;
+      for (const m of history) {
+        const match = m.body.match(/\[Code:\s*(\d{6})\]/);
+        if (match) {
+          foundShortId = match[1];
+          break;
+        }
+      }
 
-    const amountMatch = body.match(/₹\s?(\d+(\.\d{1,2})?)/);
-    if (!amountMatch) return;
+      if (!foundShortId) {
+        console.log("Payment detected but no verification code found in recent chat.");
+        return;
+      }
 
-    const amount = Number(amountMatch[1]);
+      // Find the order with this code
+      const order = await Order.findOne({ shortId: foundShortId, status: "PENDING" });
+      if (!order) return;
 
-    const order = await Order.findOne({
-      status: "PENDING",
-      finalAmount: amount,
-      phone,
-      createdAt: {
-        $gte: new Date(Date.now() - 15 * 60 * 1000), // last 15 min
-      },
-    });
+      // ACTIVATE
+      order.status = "PAID";
+      await order.save();
 
-    if (!order) return;
+      await User.findByIdAndUpdate(order.userId, {
+        isPremium: true,
+        subscriptionType: order.planType,
+        subscriptionExpiry: new Date(Date.now() + (order.planType === "yearly" ? 365 : 30) * 86400000),
+      });
 
-    // ------------------------------------
-    // ACTIVATE PREMIUM
-    // ------------------------------------
-    order.status = "PAID";
-    await order.save();
-
-    const days = order.planType === "yearly" ? 365 : 30;
-
-    await User.findByIdAndUpdate(order.userId, {
-      isPremium: true,
-      subscriptionType: order.planType,
-      subscriptionExpiry: new Date(Date.now() + days * 86400000),
-    });
-
-    await msg.reply("✅ Payment received!\n🎉 Premium activated.");
-
-    console.log("✅ Premium unlocked for", order.userId);
+      await msg.reply("🎉 *Premium Activated!* We detected your payment and verified it via Code: " + foundShortId);
+      console.log(`✅ Premium Unlocked for User ${order.userId}`);
+    }
   } catch (err) {
-    console.error("WhatsApp error:", err);
+    console.error("Bot Error:", err);
   }
 });
 
