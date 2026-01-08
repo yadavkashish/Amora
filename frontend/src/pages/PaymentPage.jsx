@@ -28,16 +28,30 @@ export default function PaymentPage() {
 
    // PaymentPage.jsx
 const handleProceed = async () => {
-  const res = await axios.post(`${API_URL}/api/payment/create-order`, { planType: selectedPlan });
-  
-  const message = `
-I want to pay ₹${res.data.amount}
-Plan: ${selectedPlan}
-Order ID: ${res.data.orderId}
-[Code: ${res.data.shortId}]
-  `.trim();
+  try {
+    const res = await axios.post(`${API_URL}/api/payment/create-order`, 
+      { planType: selectedPlan }, 
+      { withCredentials: true }
+    );
 
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    const { amount, orderId, shortId } = res.data;
+
+    // We include the [Code: XXXXXX] so the bot can regex it easily later
+    const message = `
+I want to pay ₹${amount}
+Plan: ${selectedPlan}
+Order ID: ${orderId}
+[Code: ${shortId}]
+    `.trim();
+
+    const whatsappUrl = `https://wa.me/919559167131?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, "_blank");
+    
+    setIsWaiting(true);
+    setPaymentAmount(amount);
+  } catch (err) {
+    alert("Error creating order");
+  }
 };
 
 
