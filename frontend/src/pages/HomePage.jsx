@@ -1,4 +1,8 @@
+'use client';
+
 import React from "react";
+// 1. Correct import for Vite + React Router
+import { Link } from "react-router-dom"; 
 import { 
   motion, 
   useScroll, 
@@ -75,38 +79,33 @@ const SpotlightButton = ({ children, className }) => {
 };
 
 /* ============================
-   MAIN APP
+   MAIN COMPONENT
 ============================ */
 export default function App() {
   const { scrollYProgress } = useScroll();
   
-  // High damping (30) and stiffness (100) removes the "ghosting" bounce on scroll-up
+  // Spring config for smooth parallax
   const smooth = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
 
-  // 1. HERO (0 -> 0.25)
-  // We keep it visible until 0.2, then fade it out quickly by 0.25
+  // Transform Logic for Sticky Sections
   const heroOpacity = useTransform(smooth, [0, 0.2, 0.25], [1, 1, 0]);
   const heroScale = useTransform(smooth, [0, 0.2], [1, 0.85]);
   const heroY = useTransform(smooth, [0, 0.2], [0, -100]);
 
-  // 2. FEATURES (0.2 -> 0.5)
-  // Starts coming in at 0.2, fully visible at 0.3, starts leaving at 0.45
   const featureOpacity = useTransform(smooth, [0.18, 0.28, 0.45, 0.52], [0, 1, 1, 0]);
   const featureY = useTransform(smooth, [0.18, 0.28, 0.45, 0.52], [100, 0, 0, -100]);
   const featureScale = useTransform(smooth, [0.18, 0.28], [0.9, 1]);
 
-  // 3. CAMPUS (0.5 -> 0.8)
   const campusOpacity = useTransform(smooth, [0.48, 0.58, 0.75, 0.82], [0, 1, 1, 0]);
   const campusX = useTransform(smooth, [0.48, 0.58, 0.75, 0.82], [150, 0, 0, -150]);
 
-  // 4. CTA (0.8 -> 1.0)
   const ctaOpacity = useTransform(smooth, [0.78, 0.88], [0, 1]);
   const ctaScale = useTransform(smooth, [0.78, 0.88], [0.8, 1]);
 
   return (
     <div className="relative bg-neutral-950 text-white">
       
-      {/* SECTION 1: HERO (Z-40) */}
+      {/* SECTION 1: HERO */}
       <section className="sticky top-0 h-screen flex items-center justify-center px-6 overflow-hidden z-[40]">
         <motion.div style={{ opacity: heroOpacity, scale: heroScale, y: heroY }} className="text-center max-w-5xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-pink-500/30 text-pink-400 text-[9px] font-bold uppercase tracking-[0.3em] mb-8">
@@ -116,11 +115,16 @@ export default function App() {
             Matches that <br />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-600 via-pink-400 to-pink-500">Actually Click.</span>
           </h1>
-          <SpotlightButton className="text-lg px-16 py-6 border-pink-600 !bg-pink-600/10">Start Your Vibe Check</SpotlightButton>
+          
+          <Link to="/signup">
+            <SpotlightButton className="text-lg px-16 py-6 border-pink-600 !bg-pink-600/10">
+              Start Your Vibe Check
+            </SpotlightButton>
+          </Link>
         </motion.div>
       </section>
 
-      {/* SECTION 2: FEATURES (Z-30) */}
+      {/* SECTION 2: FEATURES */}
       <section className="sticky top-0 h-screen flex items-center justify-center px-6 z-[30]">
         <motion.div style={{ opacity: featureOpacity, y: featureY, scale: featureScale }} className="max-w-6xl w-full">
           <div className="text-center mb-16">
@@ -147,7 +151,7 @@ export default function App() {
         </motion.div>
       </section>
 
-      {/* SECTION 3: CAMPUS (Z-20) */}
+      {/* SECTION 3: CAMPUS */}
       <section className="sticky top-0 h-screen flex items-center justify-center px-6 z-[20]">
         <motion.div style={{ x: campusX, opacity: campusOpacity }} className="max-w-4xl w-full text-right">
           <div className="flex justify-end mb-8">
@@ -157,55 +161,46 @@ export default function App() {
           </div>
           <h2 className="text-5xl md:text-8xl font-black text-white mb-4 tracking-tighter uppercase leading-none">Verified <br /> Campus <br /> Circles</h2>
           <div className="flex justify-end gap-3 flex-wrap">
-            {[
-  "IITs",
-  "NITs",
-  "BITS",
-  "VIT",
-  "KIET",
-  "MIT",
-  "SRM",
-  "Manipal",
-  "Amity",
-  "DTU",
-  "NSUT",
-  "JNU",
-  "DU",
-  "JU",
-  "IIMs",
-  "XLRI",
-  "NMIMS",
-  "Symbiosis",
-  "Christ", 
-  "KIIT",
-  "AKG",
-  "ABES",
-  "Galgotias",
-  "Sharda",
-  "LPU",
-  "UPES",
-  "and more…"
-]
-.map((s) => (
+            {[ "IITs", "NITs", "BITS", "VIT", "KIET", "MIT", "SRM", "Manipal", "Amity", "DTU", "NSUT", "JNU", "DU", "JU", "IIMs", "XLRI", "NMIMS", "Symbiosis", "Christ", "KIIT", "AKG", "ABES", "Galgotias", "Sharda", "LPU", "UPES", "and more…" ]
+            .map((s) => (
               <span key={s} className="px-4 py-2 rounded-full border border-pink-500/20 bg-pink-500/5 text-[10px] font-bold text-pink-300/60">{s}</span>
             ))}
           </div>
         </motion.div>
       </section>
 
-      {/* SECTION 4: FINAL CTA (Z-10) */}
-      <section className="sticky top-0 h-screen flex items-center justify-center px-6 z-[10]">
-        <motion.div style={{ scale: ctaScale, opacity: ctaOpacity }} className="text-center relative">
-          <div className="absolute inset-0 bg-pink-600/10 blur-[120px] rounded-full pointer-events-none" />
-          <h2 className="text-6xl md:text-9xl font-black text-white mb-10 tracking-tighter uppercase leading-none relative">Find Your <br /> Frequency</h2>
-          <SpotlightButton className="text-lg px-16 py-6 border-pink-500/40 !bg-pink-600/10">Start Your Vibe Check</SpotlightButton>
-        </motion.div>
-      </section>
+      {/* SECTION 4: FINAL CTA */}
+      {/* SECTION 4: FINAL CTA (Changed Z-Index to be higher at the end) */}
+<section className="sticky top-0 h-screen flex items-center justify-center px-6 z-[50] pointer-events-none">
+  <motion.div 
+    style={{ 
+      scale: ctaScale, 
+      opacity: ctaOpacity,
+      // This line is the magic fix:
+      pointerEvents: useTransform(smooth, [0.85, 0.9], ["none", "auto"]) 
+    }} 
+    className="text-center relative"
+  >
+    <div className="absolute inset-0 bg-pink-600/10 blur-[120px] rounded-full pointer-events-none" />
+    <h2 className="text-6xl md:text-9xl font-black text-white mb-10 tracking-tighter uppercase leading-none relative">
+      Find Your <br /> Frequency
+    </h2>
+    
+    <Link to="/signup" className="relative z-[60]">
+      <SpotlightButton className="text-lg px-16 py-6 border-pink-500/40 !bg-pink-600/10 cursor-pointer">
+        Start Your Vibe Check
+      </SpotlightButton>
+    </Link>
+  </motion.div>
+</section>
 
-      {/* THIS DIV PROVIDES THE SCROLL DEPTH */}
+{/* SCROLL SPACER - Ensure this is large enough */}
+<div className="h-[400vh]" />
+
+      {/* SCROLL DEPTH SPACER */}
       <div className="h-[400vh]" />
       
-     
+      
     </div>
   );
 }

@@ -1,8 +1,7 @@
-// src/pages/Signup.jsx  (replace your current file content)
 "use client";
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { motion, useMotionTemplate, useMotionValue } from "framer-motion";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Sparkles,
   User,
@@ -11,28 +10,50 @@ import {
   ArrowRight,
   Loader2,
   Fingerprint,
-  Users,
-  ChevronDown,
+  Info,
+  ShieldCheck,
+  Camera,
 } from "lucide-react";
 import SelfieCapture from "../components/SelfieCapture";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
-const BackgroundGrid = () => (
-  <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-[#05030a]">
-    <div
-      className="absolute inset-0"
-      style={{
-        backgroundImage: `
-          radial-gradient(circle at 10% 0%, rgba(244, 63, 94, 0.15), transparent 50%),
-          radial-gradient(circle at 90% 100%, rgba(168, 85, 247, 0.15), transparent 50%),
-          radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.1), transparent 50%)
-        `,
+/* ============================
+   INTERACTIVE HELPERS
+============================ */
+const SpotlightButton = ({ children, className, type = "button", disabled = false, onClick }) => {
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  return (
+    <motion.button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      onMouseMove={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        mx.set(e.clientX - r.left);
+        my.set(e.clientY - r.top);
       }}
-    />
-    <div className="absolute inset-0 opacity-[0.2] mix-blend-soft-light bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-  </div>
-);
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      className={`relative overflow-hidden rounded-2xl border border-white/20 bg-white/5 px-8 py-4 font-bold text-white backdrop-blur-sm transition-colors hover:border-pink-500/40 w-full disabled:opacity-50 ${className}`}
+    >
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: useMotionTemplate`
+            radial-gradient(120px circle at ${mx}px ${my}px,
+            rgba(236,72,153,0.3),
+            transparent 80%)
+          `,
+        }}
+      />
+      <span className="relative z-10 flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
+        {children}
+      </span>
+    </motion.button>
+  );
+};
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -41,66 +62,44 @@ const Signup = () => {
     password: "",
     gender: "",
   });
-  const [step, setStep] = useState("signup"); // signup -> selfie -> otp
+  const [step, setStep] = useState("signup");
   const [otp, setOtp] = useState("");
-  const [isLoading, setIsLoading] = useState(false); // backend request (send-otp / verify-otp)
-  const [selfieProcessing, setSelfieProcessing] = useState(false); // visual indicator while selfie capture + upload is happening
-  const [serverMsg, setServerMsg] = useState("");
-  const [userId, setUserId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selfieProcessing, setSelfieProcessing] = useState(false);
   const navigate = useNavigate();
 
-  // When user clicks "Get Started" we validate gender and move to selfie step
-  const startSelfieStep = async (e) => {
+  const startSelfieStep = (e) => {
     e.preventDefault();
     if (!formData.gender) {
       alert("Please select your gender.");
       return;
     }
-    // proceed to selfie capture step
     setStep("selfie");
   };
 
-  // Called by SelfieCapture when descriptor computed
-  // IMPORTANT: this function is async and will be awaited by SelfieCapture.
-  // We rethrow errors after setting local state so the SelfieCapture overlay can display error until it resolves.
   const onSelfieCaptured = async (descriptor) => {
-    // Show global overlay while we send selfie to server
     setIsLoading(true);
-    setServerMsg("");
     try {
       const res = await fetch(`${API_URL}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-  email: formData.email,
-  descriptor: Array.from(descriptor), // ✅ FIX
-}),
-
+          email: formData.email,
+          descriptor: Array.from(descriptor),
+        }),
         credentials: "include",
       });
 
       const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to request OTP");
 
-      if (!res.ok) {
-        const message = data?.error || data?.message || "Failed to request OTP";
-        throw new Error(message);
-      }
-
-      // backend returns userId or otp-created confirmation
-      setUserId(data.userId || data._id || null);
       setStep("otp");
-      setServerMsg(`OTP sent to ${formData.email}`);
-
-      return { ok: true, data };
     } catch (err) {
-      console.error("❌ send-otp error:", err);
-      alert("Failed to request OTP: " + (err.message || err));
+      alert(err.message);
       setStep("signup");
-      // rethrow so SelfieCapture can show its processing/error overlay too
       throw err;
     } finally {
       setIsLoading(false);
-      // ensure selfieProcessing cleared if SelfieCapture didn't already
       setSelfieProcessing(false);
     }
   };
@@ -115,211 +114,205 @@ const Signup = () => {
         credentials: "include",
         body: JSON.stringify({ ...formData, otp }),
       });
-      const data = await response.json();
       if (response.ok) {
         navigate("/compatibilityform");
       } else {
-        alert("⚠️ " + (data.error || "Invalid OTP or registration error"));
+        const data = await response.json();
+        alert(data.error || "Invalid OTP");
       }
     } catch (err) {
-      console.error("❌ Error verifying OTP:", err);
-      alert("❌ Failed to connect to server");
+      alert("Failed to connect to server");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Global overlay component for processing states
-  const GlobalProcessingOverlay = ({ message = "Processing…" }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative z-60 pointer-events-auto bg-black/80 text-white rounded-xl p-5 flex items-center gap-3 shadow-2xl">
-        <Loader2 className="animate-spin w-6 h-6" />
-        <div className="text-sm">{message}</div>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#05050a] text-slate-200 px-4">
-      <BackgroundGrid />
+    <div className="min-h-screen bg-neutral-950 text-white selection:bg-pink-500/30 flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
+      
+      {/* Background Glows */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-900/10 blur-[120px] rounded-full" />
+      </div>
 
-      {/* show global overlay when selfie is processing OR server request in-flight */}
-      {(selfieProcessing || isLoading) && (
-        <GlobalProcessingOverlay
-          message={selfieProcessing ? "Taking selfie… Please hold still" : "Processing…"}
-        />
-      )}
-
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-[400px]"
+        className="w-full max-w-lg relative z-10"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/15 to-purple-500/15 blur-2xl -z-10 rounded-3xl" />
+        {/* Branding */}
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-pink-500/30 text-pink-400 text-[10px] font-bold uppercase tracking-widest mb-6 hover:bg-pink-500/10 transition-colors">
+            <Sparkles size={12} /> AmoraOnline
+          </Link>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase mb-2">
+            {step === "signup" ? "Create " : step === "selfie" ? "Face " : "Verify "}
+            <span className="text-pink-500">{step === "signup" ? "Vibe ID" : step === "selfie" ? "ID" : "Email"}</span>
+          </h1>
+          <p className="text-slate-400 text-sm">
+            {step === "signup" ? "Join your campus circle by using your campus email." : "Secure your community presence."}
+          </p>
+        </div>
 
-        <div className="bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.5)]">
-          <div className="text-center mb-7">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 border border-white/10 mb-4 shadow-inner shadow-white/5">
-              <Sparkles className="w-5 h-5 text-pink-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">
-              {step === "signup" ? "Create Account" : step === "selfie" ? "Take a selfie" : "Verify Email"}
-            </h2>
-            <p className="text-zinc-400 text-sm font-light">
-              {step === "signup"
-                ? "Join the community where chemistry matters."
-                : step === "selfie"
-                ? "We need a short selfie to verify your profile photo later."
-                : `We sent a code to ${formData.email}`}
-            </p>
-          </div>
-
-          {step === "signup" ? (
-            <form onSubmit={startSelfieStep} className="space-y-3.5">
-              {/* Name */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
-                <div className="relative group mt-1">
-                  <User className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+        {/* Form Container */}
+        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 md:p-10 shadow-2xl shadow-pink-500/5">
+          
+          {step === "signup" && (
+            <form onSubmit={startSelfieStep} className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">Full Name</label>
+                <div className="relative group">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" size={16} />
                   <input
-                    type="text"
-                    placeholder="John Doe"
-                    value={formData.name}
+                    type="text" required value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
+                    placeholder="Enter your name"
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
               </div>
 
-              {/* Email */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">College Email</label>
-                <div className="relative group mt-1">
-                  <Mail className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">Campus Email ID</label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" size={16} />
                   <input
-                    type="email"
-                    placeholder="student@university.edu"
-                    value={formData.email}
+                    type="email" required value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
+                    placeholder="student@yourcollege.edu"
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
-                <p className="text-[10px] text-pink-300/70 ml-1 mt-1 flex items-center gap-1">
-                  <Sparkles size={9} /> Required for exclusive campus access
+                <p className="text-[10px] text-slate-500 italic mt-1 px-1">
+                  Note: Use your official campus email ID to match with people within your college campus circles.
                 </p>
               </div>
 
-              {/* Password */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Password</label>
-                <div className="relative group mt-1">
-                  <Lock className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">Password</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" size={16} />
                   <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
+                    type="password" required value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
-                    minLength={6}
+                    placeholder="••••••••"
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
               </div>
 
-              {/* Gender */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Gender</label>
-                <div className="relative group mt-1">
-                  <Users className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-8 text-sm text-white appearance-none focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all cursor-pointer"
-                    required
-                  >
-                    <option value="" className="bg-zinc-900 text-zinc-500">Select Identity</option>
-                    <option value="Male" className="bg-zinc-900">Male</option>
-                    <option value="Female" className="bg-zinc-900">Female</option>
-                    <option value="Other" className="bg-zinc-900">Other</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-zinc-500 pointer-events-none" />
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">Gender Identity</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {["Male", "Female"].map((opt) => (
+                    <button
+                      key={opt} type="button"
+                      onClick={() => setFormData({ ...formData, gender: opt })}
+                      className={`py-3 rounded-2xl border text-xs font-bold transition-all ${
+                        formData.gender === opt 
+                        ? 'bg-pink-600 border-pink-500 text-white shadow-lg shadow-pink-600/20' 
+                        : 'bg-neutral-900/50 border-white/10 text-slate-400 hover:border-white/20'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="flex items-start gap-2 bg-pink-500/5 border border-pink-500/20 p-4 rounded-2xl mt-4">
+                  <Info className="text-pink-500 shrink-0 mt-0.5" size={14} />
+                  <p className="text-[10px] text-pink-300/70 leading-relaxed">
+                    Right now, we do not include LGBTQ+ community options. We are working and making things better slowly, so in the future we will include everyone.
+                  </p>
                 </div>
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.02, boxShadow: "0 10px 20px -10px rgba(236, 72, 153, 0.5)" }}
-                whileTap={{ scale: 0.98 }}
-                disabled={isLoading}
-                className="w-full mt-6 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden after:absolute after:inset-0 after:bg-white/20 after:opacity-0 hover:after:opacity-100 after:transition-opacity"
-              >
-                {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>Get Started <ArrowRight className="w-4 h-4" /></>}
-              </motion.button>
+              <SpotlightButton type="submit" className="mt-4">
+                Get Started <ArrowRight size={14} className="ml-1" />
+              </SpotlightButton>
             </form>
-          ) : step === "selfie" ? (
-            <div className="space-y-4">
-              <SelfieCapture
-                modelsPath={`${import.meta.env.BASE_URL || '/'}models`}
-                // give SelfieCapture a setter so it can toggle the page-level overlay while it captures/awaits
-                setProcessing={(v) => setSelfieProcessing(!!v)}
-                onCaptured={onSelfieCaptured}
-              />
+          )}
 
-              <div className="text-xs text-zinc-400">
-                By taking a selfie you agree we will use it only to verify your profile photo later. <br />
-                <button onClick={() => setStep("signup")} className="text-pink-400 underline text-xs mt-2">Go back</button>
+          {step === "selfie" && (
+            <div className="space-y-6">
+              <div className="rounded-3xl overflow-hidden border border-white/10 shadow-inner bg-black relative">
+                <SelfieCapture
+                  modelsPath={`${import.meta.env.BASE_URL || '/'}models`}
+                  setProcessing={(v) => setSelfieProcessing(!!v)}
+                  onCaptured={onSelfieCaptured}
+                />
+              </div>
+              
+              {/* --- VERIFICATION DISCLAIMER --- */}
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-start gap-3">
+                <ShieldCheck className="text-pink-500 shrink-0 mt-0.5" size={16} />
+                <p className="text-[10px] md:text-xs text-slate-300 leading-relaxed">
+                  <strong>Verification Note:</strong> This image will only be used to confirm that the person creating this account matches the individual in the profile pictures you upload later.
+                </p>
+              </div>
+
+              <div className="text-center">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center justify-center gap-2">
+                   <Camera size={12} /> Please look directly into the camera
+                </p>
+                <button 
+                  onClick={() => setStep("signup")}
+                  className="mt-6 text-[10px] font-bold uppercase tracking-widest text-pink-500 hover:text-pink-400 border-b border-pink-500/20 pb-0.5 transition-colors"
+                >
+                  Edit Registration Details
+                </button>
               </div>
             </div>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">One-Time Password</label>
-                <div className="relative group mt-1">
-                  <Fingerprint className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+          )}
+
+          {step === "otp" && (
+            <form onSubmit={handleVerifyOtp} className="space-y-6 text-center">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400">Verification Code</label>
+                <div className="relative group max-w-[240px] mx-auto mt-2">
                   <input
-                    type="text"
-                    placeholder="••••••"
-                    value={otp}
+                    type="text" required maxLength={6} value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white text-center tracking-[0.5em] font-mono placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
-                    maxLength={6}
+                    placeholder="000000"
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-4 text-center text-xl tracking-[0.5em] font-mono text-white placeholder:text-slate-800 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
-              </div>
-
-              <motion.button
-                whileHover={{ scale: 1.02, boxShadow: "0 10px 20px -10px rgba(236, 72, 153, 0.5)" }}
-                whileTap={{ scale: 0.98 }}
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                <p className="text-[10px] text-slate-500">We sent a 6-digit code to your campus email.</p>
+              <SpotlightButton type="submit" disabled={isLoading}>
+                {isLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : "Verify & Activate ID"}
+              </SpotlightButton>
+              <button 
+                type="button" onClick={() => setStep("signup")}
+                className="w-full text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white"
               >
-                {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>Verify & Complete <ArrowRight className="w-4 h-4" /></>}
-              </motion.button>
-
-              <button
-                type="button"
-                onClick={() => setStep("signup")}
-                className="w-full text-xs text-zinc-500 hover:text-white transition-colors text-center"
-              >
-                Entered wrong email? Go back
+                Wrong Email Address?
               </button>
             </form>
           )}
         </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-zinc-500 text-xs">
-            Already have an account?{" "}
-            <span onClick={() => navigate("/login")} className="text-pink-400 hover:text-pink-300 cursor-pointer font-medium transition-colors underline underline-offset-4">
-              Log in
-            </span>
+        <div className="text-center mt-8 space-y-4">
+          <p className="text-sm text-slate-500">
+            Already have a Vibe ID? <Link to="/login" className="text-pink-500 font-bold hover:underline ml-1">Log In</Link>
           </p>
+          <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
+            <ShieldCheck size={14} className="text-pink-500" />
+            Verified Campus Network
+          </div>
         </div>
       </motion.div>
+
+      {/* Processing Global Loader */}
+      {(selfieProcessing || isLoading) && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-neutral-900 border border-white/10 p-6 rounded-3xl flex flex-col items-center gap-4 border-pink-500/20 shadow-2xl shadow-pink-500/10">
+            <Loader2 className="animate-spin text-pink-500" size={32} />
+            <p className="text-xs font-bold uppercase tracking-widest text-white">
+              {selfieProcessing ? "Scanning Face..." : "Verifying..."}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

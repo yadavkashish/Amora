@@ -1,8 +1,7 @@
-// Login.jsx
 "use client";
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { motion, useMotionTemplate, useMotionValue } from "framer-motion";
+import { useNavigate, Link } from "react-router-dom";
 import { 
   Sparkles, 
   Mail, 
@@ -11,25 +10,46 @@ import {
   Loader2, 
   KeyRound,
   Fingerprint,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck
 } from "lucide-react";
 
-// --- SHARED UI COMPONENTS ---
-const BackgroundGrid = () => (
-  <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-[#05030a]">
-    <div
-      className="absolute inset-0"
-      style={{
-        backgroundImage: `
-          radial-gradient(circle at 10% 0%, rgba(244, 63, 94, 0.15), transparent 50%),
-          radial-gradient(circle at 90% 100%, rgba(168, 85, 247, 0.15), transparent 50%),
-          radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.1), transparent 50%)
-        `,
+/* ============================
+   INTERACTIVE HELPERS
+============================ */
+const SpotlightButton = ({ children, className, type = "button", disabled = false, onClick }) => {
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  return (
+    <motion.button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      onMouseMove={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        mx.set(e.clientX - r.left);
+        my.set(e.clientY - r.top);
       }}
-    />
-    <div className="absolute inset-0 opacity-[0.2] mix-blend-soft-light bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-  </div>
-);
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      className={`relative overflow-hidden rounded-2xl border border-white/20 bg-white/5 px-8 py-4 font-bold text-white backdrop-blur-sm transition-colors hover:border-pink-500/40 w-full disabled:opacity-50 ${className}`}
+    >
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: useMotionTemplate`
+            radial-gradient(120px circle at ${mx}px ${my}px,
+            rgba(236,72,153,0.3),
+            transparent 80%)
+          `,
+        }}
+      />
+      <span className="relative z-10 flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
+        {children}
+      </span>
+    </motion.button>
+  );
+};
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -39,11 +59,9 @@ const Login = () => {
   const [newPassword, setNewPassword] = useState('');
   const navigate = useNavigate();
 
-  // 🔹 Handle login
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
         method: 'POST',
@@ -56,46 +74,40 @@ const Login = () => {
         navigate('/dashboard');
       } else {
         const data = await res.json();
-        alert(Object.values(data.errors || { error: data.error || 'Login failed' }).join('\n'));
+        alert(data.error || 'Login failed');
       }
     } catch (err) {
-      console.error('❌ Login error:', err);
       alert('❌ Failed to connect to server');
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔹 Request OTP for reset
   const handleForgot = async () => {
     if (!formData.email) {
-        alert("Please enter your email address in the field above first.");
+        alert("Please enter your email first.");
         return;
     }
-    
-    setLoading(true); // visual feedback
+    setLoading(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email }),
       });
-
       if (res.ok) {
         alert('📩 OTP sent to your email!');
         setShowForgot(true);
       } else {
-        alert('⚠️ Failed to send OTP. Check email and try again.');
+        alert('⚠️ Error sending OTP.');
       }
     } catch (err) {
-      console.error('❌ Forgot password error:', err);
       alert('❌ Server error');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
-  // 🔹 Reset password with OTP
   const handleReset = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -105,173 +117,130 @@ const Login = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, otp, newPassword }),
       });
-
       if (res.ok) {
-        alert('✅ Password reset successful! Please login with your new password.');
+        alert('✅ Success! Login with your new password.');
         setShowForgot(false);
-        setOtp('');
-        setNewPassword('');
       } else {
-        alert('⚠️ Failed to reset password. Invalid OTP or expired.');
+        alert('⚠️ Invalid OTP or expired.');
       }
     } catch (err) {
-      console.error('❌ Reset password error:', err);
       alert('❌ Server error');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#05050a] text-slate-200 px-4">
-      <BackgroundGrid />
+    <div className="min-h-screen bg-neutral-950 text-white selection:bg-pink-500/30 flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden font-sans">
+      
+      {/* Background Glows */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-900/10 blur-[120px] rounded-full" />
+      </div>
 
-      {/* Main Card Container */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-[400px]"
+        className="w-full max-w-lg relative z-10"
       >
-        {/* Glow Effect */}
-        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/15 to-purple-500/15 blur-2xl -z-10 rounded-3xl" />
+        {/* Branding */}
+        <div className="text-center mb-10">
+          <Link to="/" className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-pink-500/30 text-pink-400 text-[10px] font-bold uppercase tracking-widest mb-6 hover:bg-pink-500/10 transition-colors">
+            <Sparkles size={12} /> AmoraOnline
+          </Link>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase mb-2">
+            {showForgot ? "Reset " : "Welcome "} 
+            <span className="text-pink-500">{showForgot ? "Access" : "Back"}</span>
+          </h1>
+          <p className="text-slate-400 text-sm">
+            {showForgot ? "We'll get you back into your circle." : "Reconnect with your frequency."}
+          </p>
+        </div>
 
-        <div className="bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.5)]">
+        {/* Auth Card */}
+        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 md:p-10 shadow-2xl shadow-pink-500/5">
           
-          {/* Header */}
-          <div className="text-center mb-7">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 border border-white/10 mb-4 shadow-inner shadow-white/5">
-              {showForgot ? (
-                 <RotateCcw className="w-5 h-5 text-pink-400" />
-              ) : (
-                 <Sparkles className="w-5 h-5 text-pink-400" />
-              )}
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">
-              {showForgot ? "Reset Password" : "Welcome Back"}
-            </h2>
-            <p className="text-zinc-400 text-sm font-light">
-              {showForgot 
-                ? "Enter the OTP sent to your email" 
-                : "Enter your details to sign in"}
-            </p>
-          </div>
-
           {!showForgot ? (
-            // --- LOGIN FORM ---
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* Email */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Email</label>
-                <div className="relative group mt-1">
-                  <Mail className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">Email</label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" size={16} />
                   <input
-                    type="email"
+                    type="email" required
                     placeholder="student@university.edu"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">Password</label>
-                <div className="relative group mt-1">
-                  <Lock className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400">Password</label>
+                  <button type="button" onClick={handleForgot} className="text-[10px] font-bold uppercase text-slate-500 hover:text-pink-500 transition-colors">
+                    Forgot?
+                  </button>
+                </div>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" size={16} />
                   <input
-                    type="password"
+                    type="password" required
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
-                </div>
-                <div className="flex justify-end mt-2">
-                    <button
-                        type="button"
-                        onClick={handleForgot}
-                        disabled={loading}
-                        className="text-xs text-zinc-500 hover:text-pink-400 transition-colors"
-                    >
-                        Forgot Password?
-                    </button>
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <motion.button
-                whileHover={{ scale: 1.02, boxShadow: "0 10px 20px -10px rgba(236, 72, 153, 0.5)" }}
-                whileTap={{ scale: 0.98 }}
-                disabled={loading}
-                className="w-full mt-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <Loader2 className="animate-spin w-4 h-4" />
-                ) : (
-                  <>
-                    Sign In <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </motion.button>
+              <SpotlightButton type="submit" disabled={loading}>
+                {loading ? <Loader2 className="animate-spin mx-auto" size={18} /> : <>Sign In <ArrowRight size={14} className="ml-1" /></>}
+              </SpotlightButton>
             </form>
           ) : (
-            // --- RESET PASSWORD FORM ---
-            <form onSubmit={handleReset} className="space-y-4">
-               {/* OTP Input */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">One-Time Password</label>
-                <div className="relative group mt-1">
-                  <Fingerprint className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+            <form onSubmit={handleReset} className="space-y-6">
+              {/* OTP */}
+              <div className="space-y-1.5 text-center">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400">One-Time Password</label>
+                <div className="relative group mt-2 max-w-[200px] mx-auto">
                   <input
-                    type="text"
-                    placeholder="123456"
+                    type="text" required maxLength={6}
+                    placeholder="000000"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder:text-zinc-700 tracking-widest focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-4 text-center text-xl tracking-[0.5em] font-mono text-white focus:outline-none focus:border-pink-500/50"
                   />
                 </div>
               </div>
 
               {/* New Password */}
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ml-1">New Password</label>
-                <div className="relative group mt-1">
-                  <KeyRound className="absolute left-3 top-2.5 w-4.5 h-4.5 text-zinc-500 group-focus-within:text-pink-400 transition-colors" />
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">New Password</label>
+                <div className="relative group">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                   <input
-                    type="password"
+                    type="password" required
                     placeholder="New secure password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all"
-                    required
+                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
               </div>
 
-               <motion.button
-                whileHover={{ scale: 1.02, boxShadow: "0 10px 20px -10px rgba(236, 72, 153, 0.5)" }}
-                whileTap={{ scale: 0.98 }}
-                disabled={loading}
-                className="w-full mt-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3 rounded-xl shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                 {loading ? (
-                  <Loader2 className="animate-spin w-4 h-4" />
-                ) : (
-                  <>
-                    Reset Password <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </motion.button>
+              <SpotlightButton type="submit" disabled={loading}>
+                {loading ? <Loader2 className="animate-spin mx-auto" size={18} /> : "Reset & Log In"}
+              </SpotlightButton>
 
-              <button
-                type="button"
+              <button 
+                type="button" 
                 onClick={() => setShowForgot(false)}
-                className="w-full text-xs text-zinc-500 hover:text-white transition-colors text-center mt-4"
+                className="w-full text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white"
               >
                 Back to Login
               </button>
@@ -279,19 +248,16 @@ const Login = () => {
           )}
         </div>
 
-        {/* Footer Link */}
-        <div className="mt-6 text-center">
-            <p className="text-zinc-500 text-xs">
-            Don't have an account?{" "}
-            <span 
-                onClick={() => navigate('/signup')} 
-                className="text-pink-400 hover:text-pink-300 cursor-pointer font-medium transition-colors underline underline-offset-4"
-            >
-                Create one
-            </span>
-            </p>
+        {/* Footer */}
+        <div className="text-center mt-8 space-y-4">
+          <p className="text-sm text-slate-500">
+            New to AmoraOnline? <Link to="/signup" className="text-pink-500 font-bold hover:underline ml-1">Create Vibe ID</Link>
+          </p>
+          <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
+            <ShieldCheck size={14} className="text-pink-500" />
+            Secure Session Encryption
+          </div>
         </div>
-
       </motion.div>
     </div>
   );
