@@ -264,3 +264,14 @@ exports.compareProfileDescriptor = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
+
+exports.cookieOptions = function cookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+};

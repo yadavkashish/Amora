@@ -72,19 +72,29 @@ export default function Header() {
 
   // Logout Logic
   const handleLogout = async () => {
-    try {
-      await fetch(`${API_URL}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
 
-      setIsLoggedIn(false);
-      navigate("/login");
-      setMobileMenuOpen(false);
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
-  };
+    // clear client state
+    localStorage.clear();
+    sessionStorage.clear();
+
+    setIsLoggedIn(false);
+    setMobileMenuOpen(false);
+
+    // prevent back button auth ghost
+    navigate("/login", { replace: true });
+
+    // hard reset React memory
+    window.location.reload();
+  } catch (err) {
+    console.error("Logout failed:", err);
+  }
+};
+
 
   /**
    * Navigation Links

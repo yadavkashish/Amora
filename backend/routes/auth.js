@@ -4,6 +4,7 @@ const {
   sendOtp,
   verifyOtpAndRegister,
   login,
+  cookieOptions,
   forgotPassword,
   resetPassword,
   compareProfileDescriptor, // new controller export
@@ -41,13 +42,19 @@ router.post("/login", loginLimiter, login);
 
 // Logout
 router.post("/logout", (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    sameSite: "Lax",
-    secure: process.env.NODE_ENV === "production",
+  res.clearCookie("token", cookieOptions());
+
+  // future-proof (won't hurt if unused)
+  res.clearCookie("refreshToken", cookieOptions());
+  res.clearCookie("connect.sid", { path: "/" });
+
+  return res.status(200).json({
+    success: true,
+    message: "Logged out successfully",
   });
-  res.json({ message: "Logged out successfully" });
 });
+
+
 
 // ✅ Current logged-in user
 router.get("/me", protect, async (req, res) => {

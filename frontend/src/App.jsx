@@ -17,6 +17,7 @@ const ViewProfile = lazy(() => import(/* webpackChunkName: "view-profile" */ './
 const CompatibilityForm = lazy(() => import(/* webpackChunkName: "compatibility-form" */ './pages/CompatibilityForm'));
 const Contact = lazy(() => import(/* webpackChunkName: "contact" */ './components/Contact'));
 const Terms = lazy(() => import(/* webpackChunkName: "terms" */ './components/Terms'));
+const Cookies = lazy(() => import(/* webpackChunkName: "cookies" */ './components/Cookies'));
 const Privacy = lazy(() => import(/* webpackChunkName: "privacy" */ './components/Privacy'));
 const PersonalityReportDisplay = lazy(() => import(/* webpackChunkName: "personality-report-display" */ './pages/PersonalityReport'));
 const PersonalityReportPage = lazy(() => import(/* webpackChunkName: "personality-report-page" */ './pages/PersonalityReportPage'));
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/view-profile/:userId" element={<ViewProfile />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/cookies" element={<Cookies />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/personality-report" element={<PersonalityReportDisplay />} />
               <Route path="/personality-report/:userId" element={<PersonalityReportPage />} />
@@ -51,7 +53,8 @@ export default function App() {
             </Routes>
           </Suspense>
         </main>
-
+        {/* Footer */}
+        <Footer />
         
       </div>
     </Router>
