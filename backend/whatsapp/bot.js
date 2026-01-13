@@ -1,94 +1,85 @@
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const { Client, RemoteAuth } = require("whatsapp-web.js");
+const { MongoStore } = require("wwebjs-mongo");
 const qrcode = require("qrcode-terminal");
+const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const User = require("../models/User");
 
-const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: { 
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    headless: true 
-  },
-});
+// Wait for your DB connection before starting the bot
+const initBot = (dbConnection) => {
+  const store = new MongoStore({ mongoose: mongoose });
 
-client.on("qr", (qr) => {
-  console.log("SCAN QR:");
-  qrcode.generate(qr, { small: true });
-});
+  const client = new Client({
+    authStrategy: new RemoteAuth({
+      store: store,
+      backupSyncIntervalMs: 300000
+    }),
+    puppeteer: {
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+    }
+  });
 
-client.on("ready", () => {
-  console.log("✅ WhatsApp Bot Ready");
-});
+  client.on("qr", (qr) => {
+    console.log("SCAN THIS QR CODE IN YOUR LOGS:");
+    qrcode.generate(qr, { small: true });
+  });
 
-client.on("message", async (msg) => {
-  try {
-    const body = msg.body || "";
-    const phone = msg.from; // Format: 91XXXXXXXXXX@c.us
-    const msgType = msg.type;
+  client.on("ready", () => console.log("✅ WhatsApp Bot Ready & Authenticated"));
 
-    console.log(`📩 New Message from ${phone} | Type: ${msgType} | Body: ${body}`);
+  client.on("remote_session_saved", () => console.log("💾 Session saved to MongoDB"));
 
-    // --- STEP 1: INITIAL LINKING ---
-    if (body.includes("[Code:")) {
-      const codeMatch = body.match(/\[Code:\s*(\d{6})\]/);
-      if (codeMatch) {
-        const shortId = codeMatch[1];
-        
-        const updatedOrder = await Order.findOneAndUpdate(
-          { shortId, status: "PENDING" }, 
-          { phone: phone }
-        );
+  client.on("message_create", async (msg) => {
+    try {
+      const body = msg.body || "";
+      const phone = msg.from;
 
-        if (updatedOrder) {
-          console.log(`✅ Linked Code ${shortId} to ${phone}`);
-          // ALWAYS reply so the user knows the bot is active
-          await msg.reply("🔗 *Order Linked!* Please complete the payment now. I will activate your premium automatically once done.");
-        } else {
-          await msg.reply("❌ Invalid or expired code. Please generate a new order.");
+      // --- STEP 1: INITIAL LINKING ---
+      if (body.includes("[Code:")) {
+        const codeMatch = body.match(/\[Code:\s*(\d{6})\]/);
+        if (codeMatch) {
+          const shortId = codeMatch[1];
+          const order = await Order.findOneAndUpdate(
+            { shortId, status: "PENDING" },
+            { phone: phone }
+          );
+
+          if (order) {
+            await msg.reply("🔗 *Order Linked!* Send the payment now. Premium will activate automatically.");
+            console.log(`Linked ${shortId} to ${phone}`);
+          }
         }
         return;
       }
-    }
 
-    // --- STEP 2: PAYMENT DETECTION ---
-    // WhatsApp Pay messages often have type 'payment' or specific keywords
-    const isPaymentType = msgType === 'payment';
-    const hasPaymentKeywords = /Completed|Sent to|Paid ₹|भुगतान|Success/i.test(body) && body.includes("₹");
+      // --- STEP 2: PAYMENT DETECTION ---
+      const isPayment = msg.type === 'payment' || (/Completed|Paid ₹|Success/i.test(body) && body.includes("₹"));
 
-    if (isPaymentType || hasPaymentKeywords) {
-      console.log(`💰 Payment detected from ${phone}. Searching for linked order...`);
+      if (isPayment) {
+        console.log(`💰 Payment bubble detected from ${phone}`);
+        const order = await Order.findOne({ phone: phone, status: "PENDING" }).sort({ createdAt: -1 });
 
-      // Find the order linked to this specific phone number
-      const order = await Order.findOne({ 
-        phone: phone, 
-        status: "PENDING" 
-      }).sort({ createdAt: -1 }); // Get the latest one
+        if (order) {
+          order.status = "PAID";
+          await order.save();
 
-      if (!order) {
-        console.log(`❓ Payment received from ${phone} but no pending order found.`);
-        return;
+          const days = order.planType === "yearly" ? 365 : 30;
+          await User.findByIdAndUpdate(order.userId, {
+            isPremium: true,
+            subscriptionType: order.planType,
+            subscriptionExpiry: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+          });
+
+          await msg.reply("✅ *Payment received!* Premium is now active. Refresh your dashboard! 🚀");
+          console.log(`Activated Premium for ${order.userId}`);
+        }
       }
-
-      // --- STEP 3: ACTIVATE ---
-      order.status = "PAID";
-      await order.save();
-
-      const days = order.planType === "yearly" ? 365 : 30;
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + days);
-
-      await User.findByIdAndUpdate(order.userId, {
-        isPremium: true,
-        subscriptionType: order.planType,
-        subscriptionExpiry: expiryDate,
-      });
-
-      await msg.reply("🚀 *PREMIUM ACTIVATED!* Your account has been upgraded. Please refresh your app dashboard.");
-      console.log(`🎉 Success: Premium activated for User ${order.userId}`);
+    } catch (err) {
+      console.error("Bot Logic Error:", err);
     }
-  } catch (err) {
-    console.error("CRITICAL BOT ERROR:", err);
-  }
-});
+  });
 
-client.initialize();
+  client.initialize();
+};
+
+module.exports = initBot;
