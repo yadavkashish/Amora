@@ -23,52 +23,49 @@ client.on("ready", () => {
 client.on("message", async (msg) => {
   try {
     const body = msg.body || "";
-    const phone = msg.from;
+    const phone = msg.from; // Format: 91XXXXXXXXXX@c.us
+    const msgType = msg.type;
+
+    console.log(`📩 New Message from ${phone} | Type: ${msgType} | Body: ${body}`);
 
     // --- STEP 1: INITIAL LINKING ---
-    // User arrives from Frontend with the Code in the message
-    if (body.includes("Order ID") && body.includes("[Code:")) {
+    if (body.includes("[Code:")) {
       const codeMatch = body.match(/\[Code:\s*(\d{6})\]/);
-      if (!codeMatch) return;
+      if (codeMatch) {
+        const shortId = codeMatch[1];
+        
+        const updatedOrder = await Order.findOneAndUpdate(
+          { shortId, status: "PENDING" }, 
+          { phone: phone }
+        );
 
-      const shortId = codeMatch[1];
-      // Save the phone number to the order so we know who to watch
-      await Order.findOneAndUpdate({ shortId }, { phone });
-
-      console.log(`🔗 Linked Code ${shortId} to phone ${phone}`);
-      return; // No reply needed here, user is about to pay
+        if (updatedOrder) {
+          console.log(`✅ Linked Code ${shortId} to ${phone}`);
+          // ALWAYS reply so the user knows the bot is active
+          await msg.reply("🔗 *Order Linked!* Please complete the payment now. I will activate your premium automatically once done.");
+        } else {
+          await msg.reply("❌ Invalid or expired code. Please generate a new order.");
+        }
+        return;
+      }
     }
 
     // --- STEP 2: PAYMENT DETECTION ---
-    const isPayment = /Completed|Sent to|Paid ₹|भुगतान/i.test(body) && body.includes("₹");
-    
-    if (isPayment) {
-      console.log(`💰 Payment bubble detected from ${phone}. Verifying...`);
+    // WhatsApp Pay messages often have type 'payment' or specific keywords
+    const isPaymentType = msgType === 'payment';
+    const hasPaymentKeywords = /Completed|Sent to|Paid ₹|भुगतान|Success/i.test(body) && body.includes("₹");
 
-      // We fetch the last 10 messages to find the verification code sent earlier
-      const chat = await msg.getChat();
-      const history = await chat.fetchMessages({ limit: 10 });
-      
-      let foundShortId = null;
-      // Search history for the bracketed code
-      for (const m of history) {
-        const match = m.body.match(/\[Code:\s*(\d{6})\]/);
-        if (match) {
-          foundShortId = match[1];
-          break;
-        }
-      }
+    if (isPaymentType || hasPaymentKeywords) {
+      console.log(`💰 Payment detected from ${phone}. Searching for linked order...`);
 
-      if (!foundShortId) {
-        console.log("❌ Payment found, but no [Code] found in recent chat history.");
-        return;
-      }
+      // Find the order linked to this specific phone number
+      const order = await Order.findOne({ 
+        phone: phone, 
+        status: "PENDING" 
+      }).sort({ createdAt: -1 }); // Get the latest one
 
-      // Find the PENDING order with this code
-      const order = await Order.findOne({ shortId: foundShortId, status: "PENDING" });
-      
       if (!order) {
-        console.log(`❌ No pending order found for Code: ${foundShortId}`);
+        console.log(`❓ Payment received from ${phone} but no pending order found.`);
         return;
       }
 
@@ -77,19 +74,20 @@ client.on("message", async (msg) => {
       await order.save();
 
       const days = order.planType === "yearly" ? 365 : 30;
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + days);
+
       await User.findByIdAndUpdate(order.userId, {
         isPremium: true,
         subscriptionType: order.planType,
-        subscriptionExpiry: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+        subscriptionExpiry: expiryDate,
       });
 
-      // --- STEP 4: YOUR CUSTOM REPLY ---
-      await msg.reply("✅ Payment received! *Go to your profile and refresh, premium is activated.* 🚀");
-      
-      console.log(`✅ Success: Premium activated for User ${order.userId}`);
+      await msg.reply("🚀 *PREMIUM ACTIVATED!* Your account has been upgraded. Please refresh your app dashboard.");
+      console.log(`🎉 Success: Premium activated for User ${order.userId}`);
     }
   } catch (err) {
-    console.error("WhatsApp Bot Error:", err);
+    console.error("CRITICAL BOT ERROR:", err);
   }
 });
 
