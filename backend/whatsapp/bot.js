@@ -5,77 +5,102 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const User = require("../models/User");
 
-// Wait for your DB connection before starting the bot
-const initBot = (dbConnection) => {
-  const store = new MongoStore({ mongoose: mongoose });
+const initBot = () => {
+  const store = new MongoStore({ mongoose });
 
   const client = new Client({
     authStrategy: new RemoteAuth({
-      store: store,
-      backupSyncIntervalMs: 300000
+      store,
+      backupSyncIntervalMs: 300000,
     }),
     puppeteer: {
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-    }
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+    },
   });
 
   client.on("qr", (qr) => {
-    console.log("SCAN THIS QR CODE IN YOUR LOGS:");
+    console.log("📲 Scan this QR:");
     qrcode.generate(qr, { small: true });
   });
 
-  client.on("ready", () => console.log("✅ WhatsApp Bot Ready & Authenticated"));
+  client.on("ready", () => {
+    console.log("✅ WhatsApp Bot Ready");
+  });
 
-  client.on("remote_session_saved", () => console.log("💾 Session saved to MongoDB"));
-
-  client.on("message_create", async (msg) => {
+  client.on("message", async (msg) => {
     try {
-      const body = msg.body || "";
+      if (msg.fromMe) return; // 🔥 VERY IMPORTANT
+
+      const body = msg.body?.trim() || "";
       const phone = msg.from;
 
-      // --- STEP 1: INITIAL LINKING ---
+      console.log("📩 Incoming:", phone, body);
+
+      // ---------------- STEP 1: ORDER LINKING ----------------
       if (body.includes("[Code:")) {
-        const codeMatch = body.match(/\[Code:\s*(\d{6})\]/);
-        if (codeMatch) {
-          const shortId = codeMatch[1];
+        const match = body.match(/\[Code:\s*(\d{6})\]/);
+
+        if (match) {
+          const shortId = match[1];
+
           const order = await Order.findOneAndUpdate(
             { shortId, status: "PENDING" },
-            { phone: phone }
+            { phone },
+            { new: true }
           );
 
           if (order) {
-            await msg.reply("🔗 *Order Linked!* Send the payment now. Premium will activate automatically.");
-            console.log(`Linked ${shortId} to ${phone}`);
+            await msg.reply(
+              "🔗 *Order linked successfully!*\nNow send the payment screenshot or confirmation text."
+            );
+            return;
           }
         }
-        return;
       }
 
-      // --- STEP 2: PAYMENT DETECTION ---
-      const isPayment = msg.type === 'payment' || (/Completed|Paid ₹|Success/i.test(body) && body.includes("₹"));
+      // ---------------- STEP 2: PAYMENT TEXT DETECTION ----------------
+      const paymentKeywords =
+        /paid|payment successful|upi|completed|success|₹/i.test(body);
 
-      if (isPayment) {
-        console.log(`💰 Payment bubble detected from ${phone}`);
-        const order = await Order.findOne({ phone: phone, status: "PENDING" }).sort({ createdAt: -1 });
+      if (paymentKeywords) {
+        console.log("💰 Payment text detected");
 
-        if (order) {
-          order.status = "PAID";
-          await order.save();
+        const order = await Order.findOne({
+          phone,
+          status: "PENDING",
+        }).sort({ createdAt: -1 });
 
-          const days = order.planType === "yearly" ? 365 : 30;
-          await User.findByIdAndUpdate(order.userId, {
-            isPremium: true,
-            subscriptionType: order.planType,
-            subscriptionExpiry: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
-          });
-
-          await msg.reply("✅ *Payment received!* Premium is now active. Refresh your dashboard! 🚀");
-          console.log(`Activated Premium for ${order.userId}`);
+        if (!order) {
+          await msg.reply("❌ No pending order found for this number.");
+          return;
         }
+
+        order.status = "PAID";
+        await order.save();
+
+        const days = order.planType === "yearly" ? 365 : 30;
+
+        await User.findByIdAndUpdate(order.userId, {
+          isPremium: true,
+          subscriptionType: order.planType,
+          subscriptionExpiry: new Date(
+            Date.now() + days * 24 * 60 * 60 * 1000
+          ),
+        });
+
+        await msg.reply(
+          "✅ *Payment received!*\nPremium activated 🚀\nPlease refresh your dashboard."
+        );
+
+        console.log("🔥 Premium activated:", order.userId);
       }
     } catch (err) {
-      console.error("Bot Logic Error:", err);
+      console.error("❌ Bot Error:", err);
     }
   });
 

@@ -103,7 +103,9 @@ mongoose
     console.log('✅ Connected to MongoDB');
 
     // 🔥 START WHATSAPP BOT (RUNS ONCE)
-    require("./whatsapp/bot");
+   const initBot = require("./whatsapp/bot");
+initBot();
+
 
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
