@@ -27,7 +27,9 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173',
       'https://amorateams.netlify.app',
+      "https://amoraonline.in",
       'https://www.amoraonline.in',
+
     ],
     credentials: true,
   },
@@ -52,29 +54,36 @@ io.on('connection', (socket) => {
   });
 });
 
-// ---------------- CORS + PREFLIGHT ----------------
+const cors = require("cors");
+
 const allowedOrigins = [
-  'http://localhost:5173',
-  'https://amorateams.netlify.app',
-  'https://www.amoraonline.in',
+  "http://localhost:5173",
+  "https://amorateams.netlify.app",
+  "https://amoraonline.in",
+  "https://www.amoraonline.in",
 ];
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  }
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (Postman, curl, mobile apps)
+    if (!origin) return callback(null, true);
 
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Expose-Headers", "Set-Cookie");
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("CORS not allowed"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  next();
-});
+// Proper preflight handling
+app.options("*", cors());
+
+
+
 
 // ---------------- MIDDLEWARE ----------------
 app.use(express.json());
