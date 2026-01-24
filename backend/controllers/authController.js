@@ -5,7 +5,7 @@ const User = require("../models/User");
 const { sendOtpEmail } = require("../utils/sendOtp");
 const bcrypt = require("bcryptjs");
 const { encryptDescriptor, decryptDescriptor } = require("../utils/cryptoUtil");
-require('dotenv').config();
+require("dotenv").config();
 
 // helper to gen otp
 function genOtp() {
@@ -44,7 +44,10 @@ exports.sendOtp = async (req, res) => {
     console.log("Is array:", Array.isArray(descriptor));
     console.log("Descriptor length:", descriptor?.length);
 
-    if (!email || !descriptor) return res.status(400).json({ error: "Email and selfie descriptor are required" });
+    if (!email || !descriptor)
+      return res
+        .status(400)
+        .json({ error: "Email and selfie descriptor are required" });
 
     // generate OTP
     const otp = genOtp();
@@ -80,11 +83,13 @@ exports.verifyOtpAndRegister = async (req, res) => {
 
     // lookup OTP doc with stored encrypted descriptor
     const record = await Otp.findOne({ email, otp });
-    if (!record) return res.status(400).json({ error: "Invalid or expired OTP" });
+    if (!record)
+      return res.status(400).json({ error: "Invalid or expired OTP" });
 
     // prevent duplicate email
     const userExists = await User.findOne({ email });
-    if (userExists) return res.status(400).json({ error: "Email already exists" });
+    if (userExists)
+      return res.status(400).json({ error: "Email already exists" });
 
     // create new user, persist encrypted signup selfie to user's record
     const user = new User({
@@ -105,7 +110,12 @@ exports.verifyOtpAndRegister = async (req, res) => {
 
     return res.status(201).json({
       message: "Account created & logged in successfully",
-      user: { id: user._id, name: user.name, email: user.email, gender: user.gender },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        gender: user.gender,
+      },
     });
   } catch (err) {
     console.error("❌ Registration error:", err.message);
@@ -136,11 +146,13 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-    if (!email || !otp || !newPassword) return res.status(400).json({ error: "All fields are required" });
+    if (!email || !otp || !newPassword)
+      return res.status(400).json({ error: "All fields are required" });
 
     // ✅ Validate OTP
     const record = await Otp.findOne({ email, otp });
-    if (!record) return res.status(400).json({ error: "Invalid or expired OTP" });
+    if (!record)
+      return res.status(400).json({ error: "Invalid or expired OTP" });
 
     // ✅ Find user
     const user = await User.findOne({ email });
@@ -163,34 +175,33 @@ exports.resetPassword = async (req, res) => {
 };
 
 // ✅ Login
+// ✅ Login
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password required" });
     }
 
-    // Find user
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // Check password
+    // ⛔ BLOCK DELETED USERS HERE
+    // if (user.deleted) {
+    //   return res.status(410).json({ error: "This account has been deleted" });
+    // }
+
     const isPasswordCorrect = await user.comparePassword(password);
     if (!isPasswordCorrect) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // ✅ CREATE JWT TOKEN
     const token = createToken(user._id);
-
-    // ✅ SET COOKIE WITH CORRECT OPTIONS (SameSite None in production)
     res.cookie("token", token, cookieOptions());
-
-    console.log("✅ Login successful, cookie set");
 
     res.json({
       success: true,
@@ -229,16 +240,21 @@ exports.compareProfileDescriptor = async (req, res) => {
 
     const newDesc = req.body.profileDescriptor;
     if (!newDesc || !Array.isArray(newDesc)) {
-      return res.status(400).json({ error: "profileDescriptor is required (array)" });
+      return res
+        .status(400)
+        .json({ error: "profileDescriptor is required (array)" });
     }
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
     // choose base descriptor: latest profile descriptor (preferred) else signup selfie
-    let baseEncrypted = user.profileDescriptorEncrypted || user.signupSelfieEncrypted;
+    let baseEncrypted =
+      user.profileDescriptorEncrypted || user.signupSelfieEncrypted;
     if (!baseEncrypted) {
-      return res.status(404).json({ error: "No stored descriptor to compare with" });
+      return res
+        .status(404)
+        .json({ error: "No stored descriptor to compare with" });
     }
 
     let baseDesc;
@@ -246,7 +262,9 @@ exports.compareProfileDescriptor = async (req, res) => {
       baseDesc = decryptDescriptor(baseEncrypted);
     } catch (e) {
       console.error("Failed to decrypt stored descriptor:", e);
-      return res.status(500).json({ error: "Failed to decrypt stored descriptor" });
+      return res
+        .status(500)
+        .json({ error: "Failed to decrypt stored descriptor" });
     }
 
     // compute euclidean distance and match threshold

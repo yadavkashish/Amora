@@ -6,6 +6,9 @@ import HomePage from './pages/HomePage';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import PaymentPage from './pages/PaymentPage';
+import SettingsPage from "./pages/SettingsPage";
+import AccountPrivacyPage from './pages/AccountPrivacyPage';
+import AccountDeletedPage from './pages/AccountDeletedPage';
 // Lazy (split into separate chunks)
 const Login = lazy(() => import(/* webpackChunkName: "login" */ './pages/Login'));
 const Signup = lazy(() => import(/* webpackChunkName: "signup" */ './pages/Signup'));
@@ -50,6 +53,11 @@ export default function App() {
               <Route path="/personality-report" element={<PersonalityReportDisplay />} />
               <Route path="/personality-report/:userId" element={<PersonalityReportPage />} />
               <Route path="/premium" element={< PaymentPage/>} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/privacy" element={<AccountPrivacyPage />} />
+              <Route path="/account-deleted" element={<AccountDeletedPage />} />
+
+
             </Routes>
           </Suspense>
         </main>

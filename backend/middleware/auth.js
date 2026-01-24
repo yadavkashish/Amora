@@ -1,34 +1,34 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
 exports.protect = async (req, res, next) => {
   try {
     const token = req.cookies.token;
 
-    console.log('🔍 Auth Check:');
-    console.log('  - Available cookies:', Object.keys(req.cookies));
-    console.log('  - Token value:', token ? token.substring(0, 20) + '...' : 'NOT FOUND');
-
     if (!token) {
-      return res.status(401).json({ error: 'Not authorized, token missing' });
+      return res.status(401).json({ error: "Not authorized, token missing" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-password');
+
+    const user = await User.findById(decoded.userId).select("-password");
+
+    // if (!req.user) {
+    //   return res.status(401).json({ error: "Not authenticated" });
+    // }
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(401).json({ error: "User not found" });
     }
 
-    req.user = user;
-    req.user._id = user._id;
+    if (user.deleted === true) {
+      return res.status(410).json({ error: "Account deleted" });
+    }
 
-    console.log('✅ Auth successful for:', user.email);
+    req.user = user; // <-- THIS IS ENOUGH. DO NOT MODIFY req.user again.
+
     next();
   } catch (err) {
-    console.error('❌ Auth error:', err.message);
-    res.status(401).json({ error: 'Not authorized', details: err.message });
+    res.status(401).json({ error: "Not authorized", details: err.message });
   }
 };
-

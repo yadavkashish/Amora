@@ -12,6 +12,8 @@ const {
 const { protect } = require("../middleware/auth");
 const { otpLimiter, loginLimiter } = require("../middleware/rateLimiter");
 const User = require("../models/User");
+const Profile = require("../models/Profile");
+const PersonalityReport = require("../models/PersonalityReport");
 
 // OTP Routes with limiter
 router.post("/send-otp", otpLimiter, sendOtp);
@@ -23,7 +25,7 @@ router.post("/reset-password", resetPassword);
 router.get("/user/:id", protect, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
-      "name age gender bio interests profilePic emailDomain"
+      "name age gender bio interests profilePic emailDomain",
     );
 
     if (!user) {
@@ -35,7 +37,6 @@ router.get("/user/:id", protect, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch user" });
   }
 });
-
 
 // Login route with limiter
 router.post("/login", loginLimiter, login);
@@ -54,17 +55,46 @@ router.post("/logout", (req, res) => {
   });
 });
 
+router.put("/privacy", protect, async (req, res) => {
+  try {
+    const { privacy } = req.body;
 
+    if (!["public", "private"].includes(privacy)) {
+      return res.status(400).json({ error: "Invalid privacy value" });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, { privacy });
+
+    res.json({ success: true, privacy });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update privacy" });
+  }
+});
 
 // ✅ Current logged-in user
 router.get("/me", protect, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select("-password");
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ user });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch user" });
+  const user = await User.findById(req.user._id).select(
+    "name email gender privacy emailDomain profilePicURL deleted isPremium subscriptionExpiry",
+  );
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
   }
+
+ if (user.deleted === true) {
+  // clear dead token
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
+  });
+
+  return res.status(410).json({ error: "Account deleted" });
+}
+
+
+  res.json({ user });
 });
 
 // ✅ All users from SAME DOMAIN except current user
@@ -88,6 +118,35 @@ router.get("/all-users", protect, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch users" });
   }
 });
+
+router.delete("/delete-account", protect, async (req, res) => {
+  const userId = req.user._id;
+
+  try {
+    // Delete Profile
+    await Profile.deleteOne({ user: userId });
+
+    // Delete Personality Report
+    await PersonalityReport.deleteOne({ userId });
+
+    // Hard delete user
+    await User.findByIdAndDelete(userId);
+
+    // Clear login token
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/",
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("❌ Delete error:", err);
+    return res.status(500).json({ error: "Failed to delete account" });
+  }
+});
+
 
 /**
  * POST /api/auth/compare-profile-descriptor
