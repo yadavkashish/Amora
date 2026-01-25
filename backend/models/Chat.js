@@ -3,30 +3,56 @@ const mongoose = require("mongoose");
 const chatSchema = new mongoose.Schema(
   {
     participants: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
+      { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     ],
+
     initiatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+
+      required: true,
     },
+
     status: {
       type: String,
-      enum: ["REQUESTED", "ACCEPTED", "BLOCKED"],
-      default: "REQUESTED"
+      enum: ["REQUESTED", "ACCEPTED", "REJECTED", "BLOCKED"],
+      default: "REQUESTED",
     },
+
     blockedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null
+      default: null,
     },
+
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
-      default: null
-    }
+      default: null,
+    },
+
+    readStatus: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        lastSeenMessage: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Message",
+          default: null,
+        },
+        unreadCount: { type: Number, default: 0 },
+      },
+    ],
+
+    requestNote: {
+      type: String,
+      maxlength: 150,
+      default: null,
+    },
+
+    // ❌ REMOVE THIS — caused the error
+    // note: { type: String, default: null, maxlength: 200 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Chat", chatSchema);

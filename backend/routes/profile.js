@@ -261,9 +261,26 @@ router.put(
    ======================================================= */
 router.get("/all-profiles", protect, async (req, res) => {
   try {
-    const { gender, branch, course, year, interest } = req.query;
+    const me = await User.findById(req.user._id);
+    if (!me) return res.status(404).json({ error: "User not found" });
 
     const filter = { user: { $ne: req.user._id } };
+
+    // ---- PRIVACY LOGIC ----
+    if (me.privacy === "private") {
+      // Private users: ONLY same-domain students
+      filter.emailDomain = me.emailDomain;
+    } else {
+      // Public users: Gmail + same domain only
+      filter.$or = [
+        { emailDomain: "gmail.com" },
+        { emailDomain: me.emailDomain }
+      ];
+    }
+
+    // Additional UI-based filters (gender, year, etc)
+    const { gender, branch, course, year, interest } = req.query;
+
     if (gender) filter.gender = gender;
     if (branch) filter.branch = branch;
     if (course) filter.course = course;
@@ -271,16 +288,30 @@ router.get("/all-profiles", protect, async (req, res) => {
     if (interest) filter.interests = { $in: [interest] };
 
     const profiles = await Profile.find(filter)
-      .select(
-        "name age gender branch course year bio preference profilePic morePics interests coverImage"
-      )
-      .populate("user", "email");
+      .select("name age gender branch course year bio preference profilePic morePics interests coverImage")
+      .populate("user", "email emailDomain privacy");
 
     res.json(profiles);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ error: "Failed to fetch profiles" });
   }
 });
+
+router.put("/privacy", protect, async (req, res) => {
+  try {
+    const { privacy } = req.body;
+    if (!["public", "private"].includes(privacy))
+      return res.status(400).json({ error: "Invalid privacy value" });
+
+    await User.findByIdAndUpdate(req.user._id, { privacy });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update privacy" });
+  }
+});
+
 
 /* =======================================================
    GET profile by userId

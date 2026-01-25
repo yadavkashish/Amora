@@ -15,11 +15,10 @@ import {
   School,
   Zap,
   Loader2,
-  Search
+  Search,
 } from "lucide-react";
-import { sendChatRequest } from "../api/chat";
+import { sendChatRequest } from "../api/chatApi";
 import MatchCard from "../components/MatchCard";
-
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = `${BASE_URL}` || "http://localhost:5000";
@@ -148,7 +147,7 @@ function ErrorState({ error, onRetry }) {
 //       className="group h-full"
 //     >
 //       <div className="relative h-full bg-black/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-pink-500/30 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-pink-500/10">
-        
+
 //         {/* Image Area */}
 //         <div className="relative h-72 overflow-hidden bg-zinc-900">
 //           {match.profilePic && !imageFailed ? (
@@ -269,40 +268,79 @@ export default function DashboardModern() {
         setLoading(true);
         setError(null);
 
-        const meRes = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true, signal });
-        setMe(meRes.data.user || null);
+        let meRes;
 
-        const matchesRes = await axios.get(`${API_URL}/api/compatibility/all-matches`, { withCredentials: true, signal });
+        try {
+          meRes = await axios.get(`${API_URL}/api/auth/me`, {
+            withCredentials: true,
+            signal,
+          });
+        } catch (err) {
+          const status = err.response?.status;
+
+          // Cookie not yet set → retry
+          if (status === 401 || status === 403) {
+            setTimeout(fetchData, 300);
+            return;
+          }
+
+          // Only redirect if server CONFIRMED delete
+          if (status === 410) {
+            navigate("/account-deleted");
+            return;
+          }
+
+          throw err; // continue to outer catch
+        }
+
+        const user = meRes.data?.user;
+
+        if (!user) {
+          // If backend didn't respond with user, retry
+          setTimeout(fetchData, 200);
+          return;
+        }
+
+        if (user.deleted === true) {
+          navigate("/account-deleted");
+          return;
+        }
+
+        setMe(user);
+
+        // Now fetch matches
+        const matchesRes = await axios.get(
+          `${API_URL}/api/compatibility/all-matches`,
+          { withCredentials: true, signal },
+        );
 
         const payload = matchesRes.data;
-        const rawMatches = Array.isArray(payload) ? payload : Array.isArray(payload?.matches) ? payload.matches : payload?.data || [];
+        const rawMatches = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.matches)
+            ? payload.matches
+            : payload?.data || [];
 
-        const normalized = rawMatches.map((m) => ({
-  ...m,
-
-  // existing fields you already rely on
-  compatibility: Number(m.compatibility ?? 0),
-  gender: m.gender ?? "",
-  emailDomain: m.emailDomain ?? "",
-
-  // new chat-request-related fields
-  chatStatus: m.chatStatus || "NONE", // NONE | REQUESTED | ACCEPTED | BLOCKED
-  chatId: m.chatId || null,
-}));
-
+        const normalized = rawMatches
+          .filter((m) => !m.isDeleted)
+          .map((m) => ({
+            ...m,
+            compatibility: Number(m.compatibility ?? 0),
+            chatStatus: m.chatStatus ?? "NONE",
+          }));
 
         setMatches(normalized);
         setLoading(false);
       } catch (err) {
-        if (axios.isCancel?.(err) || err.name === "CanceledError") return;
-        console.error("❌ Error fetching data:", err);
-        setError(err.response?.data?.error || err.message || "Failed to load matches");
-        setLoading(false);
+        setError(err.response?.data?.error || "Failed to load matches");
       }
     };
 
     fetchData();
-    return () => { if (abortRef.current) abortRef.current.abort(); };
+
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
   }, []);
 
   // ===== APPLY FILTERS =====
@@ -314,10 +352,23 @@ export default function DashboardModern() {
 
     let result = [...matches];
 
-    // Domain Filter (Strict)
-    if (me.emailDomain) {
-      result = result.filter((m) => m.emailDomain === me.emailDomain);
+    // REAL PRIVACY FILTER (must match backend rules)
+    if (me.privacy === "private") {
+      // Private users → only same-domain
+      // REAL PRIVACY FILTER (must match backend rules)
+      result = result.filter((m) => {
+        // 1️⃣ Same domain is always visible
+        if (m.emailDomain === me.emailDomain) return true;
+
+        // 2️⃣ Public profiles visible cross-domain
+        if (m.privacy === "public") return true;
+
+        // Otherwise blocked
+        return false;
+      });
     }
+
+  
 
     // Gender Filter
     const userGender = normalizeGender(me.gender);
@@ -334,38 +385,58 @@ export default function DashboardModern() {
 
     // Compatibility Filter
     switch (filter) {
-      case "80+": result = result.filter((m) => Number(m.compatibility) >= 80); break;
-      case "60-80": result = result.filter((m) => { const c = Number(m.compatibility); return c >= 60 && c < 80; }); break;
-      case "below60": result = result.filter((m) => Number(m.compatibility) < 60); break;
-      default: break;
+      case "80+":
+        result = result.filter((m) => Number(m.compatibility) >= 80);
+        break;
+      case "60-80":
+        result = result.filter((m) => {
+          const c = Number(m.compatibility);
+          return c >= 60 && c < 80;
+        });
+        break;
+      case "below60":
+        result = result.filter((m) => Number(m.compatibility) < 60);
+        break;
+      default:
+        break;
     }
 
     setFilteredMatches(result);
   }, [matches, me, filter]);
 
- const handleRequestChat = async (match) => {
-  try {
-    await sendChatRequest(match.userId); // ✅ userId is correct
-    
-    setMatches(prev =>
-      prev.map(m =>
-        m.userId === match.userId
-          ? { ...m, chatStatus: "REQUESTED" }
-          : m
-      )
-    );
-  } catch (err) {
-    alert(err.response?.data?.error || "Failed to send request");
-  }
-};
-
-
   // ===== HANDLERS =====
   const handleViewProfile = (match) => {
     navigate(`/view-profile/${match.userId}`, {
-      state: { compatibility: Math.round(Number(match.compatibility) || 0), matchName: match.name, matchGender: match.gender },
+      state: {
+        compatibility: Math.round(Number(match.compatibility) || 0),
+        matchName: match.name,
+        matchGender: match.gender,
+      },
     });
   };
+
+  const fetchMatchesData = async () => {
+  const res = await axios.get(`${API_URL}/api/compatibility/all-matches`, {
+    withCredentials: true,
+  });
+
+  const payload = res.data;
+  const rawMatches = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.matches)
+        ? payload.matches
+        : payload?.data || [];
+
+  const normalized = rawMatches
+    .filter((m) => !m.isDeleted)
+    .map((m) => ({
+      ...m,
+      compatibility: Number(m.compatibility ?? 0),
+    }));
+
+  setMatches(normalized);
+};
+
 
   const handleSendMessage = (match) => {
     navigate(`/chat/${match.userId}`, { state: { matchName: match.name } });
@@ -373,17 +444,36 @@ export default function DashboardModern() {
 
   // ===== STATS =====
   const stats = {
-    perfect: filteredMatches.filter((m) => Number(m.compatibility) >= 80).length,
-    great: filteredMatches.filter((m) => { const c = Number(m.compatibility); return c >= 60 && c < 80; }).length,
-    average: filteredMatches.length > 0 ? Math.round(filteredMatches.reduce((s, m) => s + Number(m.compatibility || 0), 0) / filteredMatches.length) : 0,
+    perfect: filteredMatches.filter((m) => Number(m.compatibility) >= 80)
+      .length,
+    great: filteredMatches.filter((m) => {
+      const c = Number(m.compatibility);
+      return c >= 60 && c < 80;
+    }).length,
+    average:
+      filteredMatches.length > 0
+        ? Math.round(
+            filteredMatches.reduce(
+              (s, m) => s + Number(m.compatibility || 0),
+              0,
+            ) / filteredMatches.length,
+          )
+        : 0,
     total: filteredMatches.length,
   };
 
   // ===== RENDER =====
   if (loading) return <LoadingSkeleton />;
-  if (error) return <ErrorState error={error} onRetry={() => window.location.reload()} />;
+  if (error) {
+    console.warn("Ignoring dashboard error:", error);
+  }
 
-  const oppositeGender = normalizeGender(me?.gender) === "male" ? "Female" : normalizeGender(me?.gender) === "female" ? "Male" : "Other";
+  const oppositeGender =
+    normalizeGender(me?.gender) === "male"
+      ? "Female"
+      : normalizeGender(me?.gender) === "female"
+        ? "Male"
+        : "Other";
   const getDomainDisplay = (domain) => {
     if (!domain) return "";
     const name = domain.replace("@", "").split(".")[0];
@@ -397,18 +487,19 @@ export default function DashboardModern() {
       {/* --- Header Section --- */}
       <section className="relative pt-24 pb-12 px-6">
         <div className="max-w-7xl mx-auto text-center z-10 relative">
-          
           {/* User Pill */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-pink-500/20 bg-pink-500/10 backdrop-blur-sm mb-6"
           >
             <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
-            <span className="text-xs font-bold text-pink-300 tracking-wider uppercase">Welcome back, {me?.name}</span>
+            <span className="text-xs font-bold text-pink-300 tracking-wider uppercase">
+              Welcome back, {me?.name}
+            </span>
           </motion.div>
 
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6"
@@ -419,17 +510,21 @@ export default function DashboardModern() {
             </span>
           </motion.h1>
 
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
             className="text-zinc-400 text-lg max-w-2xl mx-auto mb-10 font-light"
           >
-            Discover {oppositeGender.toLowerCase()} students from <span className="text-white font-semibold">{getDomainDisplay(me?.emailDomain)}</span> who match your vibe.
+            Discover {oppositeGender.toLowerCase()} students from{" "}
+            <span className="text-white font-semibold">
+              {getDomainDisplay(me?.emailDomain)}
+            </span>{" "}
+            who match your vibe.
           </motion.p>
 
           {/* Filters */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -437,22 +532,40 @@ export default function DashboardModern() {
           >
             {[
               { label: "All Matches", value: "all", icon: Search },
-              { label: "High Match (80%+)", value: "80+", icon: Flame, color: "text-emerald-400" },
-              { label: "Great Match (60-80%)", value: "60-80", icon: Sparkles, color: "text-blue-400" },
-              { label: "Exploratory", value: "below60", icon: Users, color: "text-amber-400" },
+              {
+                label: "High Match (80%+)",
+                value: "80+",
+                icon: Flame,
+                color: "text-emerald-400",
+              },
+              {
+                label: "Great Match (60-80%)",
+                value: "60-80",
+                icon: Sparkles,
+                color: "text-blue-400",
+              },
+              {
+                label: "Exploratory",
+                value: "below60",
+                icon: Users,
+                color: "text-amber-400",
+              },
             ].map((btn) => (
               <button
                 key={btn.value}
                 onClick={() => setFilter(btn.value)}
                 className={`
                   relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border
-                  ${filter === btn.value 
-                    ? "bg-white/10 border-pink-500/50 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]" 
-                    : "bg-black/20 border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20"
+                  ${
+                    filter === btn.value
+                      ? "bg-white/10 border-pink-500/50 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]"
+                      : "bg-black/20 border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20"
                   }
                 `}
               >
-                <btn.icon className={`w-4 h-4 ${filter === btn.value ? btn.color || 'text-pink-400' : ''}`} />
+                <btn.icon
+                  className={`w-4 h-4 ${filter === btn.value ? btn.color || "text-pink-400" : ""}`}
+                />
                 {btn.label}
               </button>
             ))}
@@ -462,29 +575,26 @@ export default function DashboardModern() {
 
       {/* --- Main Content Grid --- */}
       <div className="max-w-7xl mx-auto px-6">
-        
         {/* Matches Grid */}
         <AnimatePresence mode="wait">
           {filteredMatches.length > 0 ? (
-            <motion.div 
+            <motion.div
               key="grid"
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-20"
             >
               {filteredMatches.map((match, idx) => (
-  <MatchCard
-    key={match.userId}
-    match={match}
-    idx={idx}
-    isLocked={!me?.isPremium && match.isLocked}
-    onViewProfile={handleViewProfile}
-    onMessage={handleSendMessage}
-    onRequestChat={handleRequestChat}
-  />
-))}
-
+                <MatchCard
+                  key={match.userId}
+                  match={match}
+                  onViewProfile={handleViewProfile}
+                  onMessage={handleSendMessage}
+                  fetchMatches={() => setMatches([...matches])}
+                  isLocked={!me?.isPremium && match.isLocked}
+                />
+              ))}
             </motion.div>
           ) : (
-            <motion.div 
+            <motion.div
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -494,11 +604,14 @@ export default function DashboardModern() {
               <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-zinc-600" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">No matches found</h3>
+              <h3 className="text-xl font-bold text-white mb-2">
+                No matches found
+              </h3>
               <p className="text-zinc-500 max-w-md mx-auto mb-6">
-                Try adjusting your filters or wait for more students from {getDomainDisplay(me?.emailDomain)} to join.
+                Try adjusting your filters or wait for more students from{" "}
+                {getDomainDisplay(me?.emailDomain)} to join.
               </p>
-              <button 
+              <button
                 onClick={() => setFilter("all")}
                 className="text-pink-400 text-sm hover:text-pink-300 font-medium underline underline-offset-4"
               >
@@ -510,7 +623,7 @@ export default function DashboardModern() {
 
         {/* --- Stats HUD --- */}
         {filteredMatches.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
@@ -522,24 +635,63 @@ export default function DashboardModern() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Perfect Matches", value: stats.perfect, sub: "80%+ Score", color: "text-emerald-400", border: "border-emerald-500/20", bg: "bg-emerald-500/5" },
-                { label: "Great Matches", value: stats.great, sub: "60-80% Score", color: "text-blue-400", border: "border-blue-500/20", bg: "bg-blue-500/5" },
-                { label: "Avg Compatibility", value: `${stats.average}%`, sub: "Campus Average", color: "text-purple-400", border: "border-purple-500/20", bg: "bg-purple-500/5" },
-                { label: "Total Students", value: stats.total, sub: "Filtered View", color: "text-orange-400", border: "border-orange-500/20", bg: "bg-orange-500/5" },
+                {
+                  label: "Perfect Matches",
+                  value: stats.perfect,
+                  sub: "80%+ Score",
+                  color: "text-emerald-400",
+                  border: "border-emerald-500/20",
+                  bg: "bg-emerald-500/5",
+                },
+                {
+                  label: "Great Matches",
+                  value: stats.great,
+                  sub: "60-80% Score",
+                  color: "text-blue-400",
+                  border: "border-blue-500/20",
+                  bg: "bg-blue-500/5",
+                },
+                {
+                  label: "Avg Compatibility",
+                  value: `${stats.average}%`,
+                  sub: "Campus Average",
+                  color: "text-purple-400",
+                  border: "border-purple-500/20",
+                  bg: "bg-purple-500/5",
+                },
+                {
+                  label: "Total Students",
+                  value: stats.total,
+                  sub: "Filtered View",
+                  color: "text-orange-400",
+                  border: "border-orange-500/20",
+                  bg: "bg-orange-500/5",
+                },
               ].map((stat, i) => (
-                <div key={i} className={`p-5 rounded-2xl border ${stat.border} ${stat.bg} backdrop-blur-sm`}>
-                  <p className="text-zinc-400 text-xs font-medium mb-1">{stat.label}</p>
-                  <p className={`text-3xl font-bold ${stat.color} mb-1`}>{stat.value}</p>
-                  <p className="text-white/20 text-[10px] uppercase tracking-wider">{stat.sub}</p>
+                <div
+                  key={i}
+                  className={`p-5 rounded-2xl border ${stat.border} ${stat.bg} backdrop-blur-sm`}
+                >
+                  <p className="text-zinc-400 text-xs font-medium mb-1">
+                    {stat.label}
+                  </p>
+                  <p className={`text-3xl font-bold ${stat.color} mb-1`}>
+                    {stat.value}
+                  </p>
+                  <p className="text-white/20 text-[10px] uppercase tracking-wider">
+                    {stat.sub}
+                  </p>
                 </div>
               ))}
             </div>
 
             <div className="mt-6 flex items-start gap-3 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-               <Star className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
-               <p className="text-indigo-200 text-sm leading-relaxed">
-                 <span className="font-bold text-white">Pro Tip:</span> Refine your personality assessment to improve the accuracy of the Vibe Check algorithm. Higher accuracy means better matches.
-               </p>
+              <Star className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+              <p className="text-indigo-200 text-sm leading-relaxed">
+                <span className="font-bold text-white">Pro Tip:</span> Refine
+                your personality assessment to improve the accuracy of the Vibe
+                Check algorithm. Higher accuracy means better matches.
+              </p>
             </div>
           </motion.div>
         )}

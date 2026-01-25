@@ -41,11 +41,22 @@ const userSchema = new mongoose.Schema(
     profileVerified: { type: Boolean, default: false },
     profilePicURL: { type: String, default: null },
 
-    blockedUsers: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "User" }
-    ],
+    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
+    deleted: { type: Boolean, default: false },
+
+
+    privacy: {
+      type: String,
+      enum: ["public", "private"],
+      default: function () {
+        const domain = this.email?.split("@")[1]?.toLowerCase();
+        return domain === "gmail.com" ? "public" : "private";
+      },
+    },
+    
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // extract domain

@@ -20,8 +20,10 @@ import {
   ChevronRight,
   ImagePlus,
   Loader,
+  MoreHorizontal,
 } from "lucide-react";
 import CompareDialog from "./CompareDialog";
+import ViewProfileOptionsModal from "../components/modals/ViewProfileOptionsModal";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -225,6 +227,7 @@ export default function ViewProfile() {
   const [viewerIndex, setViewerIndex] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
 
   // gather images: profilePic first then morePics
   const allImages = [];
@@ -379,6 +382,27 @@ export default function ViewProfile() {
     }
     const updated = await res.json();
     return updated;
+  };
+
+  const handleBlockUser = async () => {
+    try {
+      const base = (API_URL || "http://localhost:5000").replace(/\/$/, "");
+
+      await axios.post(
+        `${base}/api/chat/${userId}/block`,
+        {},
+        { withCredentials: true }
+      );
+
+      alert("User has been blocked.");
+      setShowOptions(false);
+
+      // Optional: Redirect back to home
+      navigate("/explore");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to block user.");
+    }
   };
 
   const handleAddFiles = async (fileList) => {
@@ -549,6 +573,18 @@ export default function ViewProfile() {
                     >
                       {profile.age ? `${profile.age} years` : null}
                     </div>
+                    <button
+                      onClick={() => setShowOptions(true)}
+                      className="p-2 hover:bg-white/10 rounded-full"
+                    >
+                      <MoreHorizontal size={22} className="text-zinc-300" />
+                    </button>
+
+                    <ViewProfileOptionsModal
+                      open={showOptions}
+                      onClose={() => setShowOptions(false)}
+                      onBlock={handleBlockUser}
+                    />
 
                     {/* --- EMAIL (from User model) --- */}
                     <h2 className="text-xl font-extrabold mb-1 text-center">

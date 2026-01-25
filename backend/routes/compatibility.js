@@ -6,6 +6,7 @@ const PersonalityReport = require("../models/PersonalityReport");
 const CompatibilityCache = require("../models/CompatibilityCache");
 const User = require("../models/User");
 const Profile = require("../models/Profile");
+const Chat = require("../models/Chat");
 
 // ============================================================================
 // HELPER: Normalize gender for consistent comparison
@@ -26,7 +27,6 @@ function isUserPremium(user) {
     new Date(user.subscriptionExpiry) > new Date()
   );
 }
-
 
 // ============================================================================
 // HELPER: Get opposite gender filter query
@@ -152,7 +152,7 @@ function calculateBigFiveScores(answers) {
   Object.keys(bigFive).forEach((dimension) => {
     if (counts[dimension] > 0) {
       bigFive[dimension] = Math.round(
-        (bigFive[dimension] / counts[dimension]) * 20
+        (bigFive[dimension] / counts[dimension]) * 20,
       );
     }
   });
@@ -197,7 +197,7 @@ router.get("/match/:user1Id/:user2Id", protect, async (req, res) => {
 
     const result = matcher.calculateCompatibility(
       report1.bigFive,
-      report2.bigFive
+      report2.bigFive,
     );
     const weighted = matcher.calculateWeightedCompatibility(report1, report2);
     const category = matcher.categorizeMatch
@@ -212,11 +212,11 @@ router.get("/match/:user1Id/:user2Id", protect, async (req, res) => {
       breakdown: result.breakdown,
       strengthAreas: result.details.strengthAreas.map((s) => s.dimension || s),
       challengeAreas: result.details.challengeAreas.map(
-        (c) => c.dimension || c
+        (c) => c.dimension || c,
       ),
       complementaryTraits: result.details.complementaryTraits,
       potentialConflicts: result.details.potentialConflicts.map(
-        (p) => p.issue || p
+        (p) => p.issue || p,
       ),
       interpretation: result.interpretation,
       category,
@@ -237,7 +237,7 @@ router.get("/match/:user1Id/:user2Id", protect, async (req, res) => {
 
 // ============================================================================
 // GET: Get all matches for current user (sorted by compatibility)
-// ✨ NOW WITH EMAIL DOMAIN + OPPOSITE GENDER FILTERING ✨
+// ✨ FIXED + OPTIMIZED VERSION ✨
 // ============================================================================
 router.get("/all-matches", protect, async (req, res) => {
   try {
@@ -245,221 +245,173 @@ router.get("/all-matches", protect, async (req, res) => {
 
     const userId = req.user._id;
 
-    // Step 1: Get current user details (need gender & emailDomain)
-    const currentUser = await User.findById(userId);
+    // STEP 1 — Current User
+    const currentUser = await User.findOne({ _id: userId, deleted: false });
+    if (!currentUser) return res.status(404).json({ error: "User not found" });
+
     const premiumUser = isUserPremium(currentUser);
 
-    if (!currentUser) {
-      console.error("❌ Current user not found:", userId);
-      return res.status(404).json({ error: "User not found" });
-    }
-    console.log("✅ Current user found:", {
+    console.log("🎯 Current User:", {
       name: currentUser.name,
       gender: currentUser.gender,
-      emailDomain: currentUser.emailDomain,
+      domain: currentUser.emailDomain,
+      privacy: currentUser.privacy,
     });
 
-    // Step 2: Get current user's personality report
+    // STEP 2 — Personality Report
     const myReport = await PersonalityReport.findOne({ userId });
     if (!myReport) {
-      console.warn("⚠️ No report found for user:", userId);
       return res.status(404).json({
         error: "Please complete personality assessment first",
       });
     }
-    console.log("✅ Current user report found");
+    console.log("🧠 Personality report found");
 
-    // Step 3: Build opposite gender filter
+    // STEP 3 — Opposite Gender Filter
     const genderFilter = getOppositeGenderFilter(currentUser.gender);
-    console.log("🔍 Gender filter:", genderFilter);
 
-    // ✅ Step 4: Build DOMAIN FILTER (Same email domain)
-    const domainFilter = {
-      emailDomain: currentUser.emailDomain,
-    };
-    console.log("🎓 Domain filter:", domainFilter);
+    // STEP 4 — Domain Visibility Logic
+    const isGmail = currentUser.emailDomain === "gmail.com";
+    const userDomain = currentUser.emailDomain;
+    const isPublic = currentUser.privacy === "public";
 
-    // ✅ Step 5: Get all other users from SAME DOMAIN with opposite gender
+    let domainMatchCondition = {};
+
+    if (isGmail) {
+      if (isPublic)
+        domainMatchCondition = {
+          $or: [{ privacy: "public" }, { emailDomain: "gmail.com" }],
+        };
+      else domainMatchCondition = { emailDomain: "gmail.com" };
+    } else {
+      if (isPublic)
+        domainMatchCondition = {
+          $or: [{ emailDomain: userDomain }, { privacy: "public" }],
+        };
+      else domainMatchCondition = { emailDomain: userDomain };
+    }
+
+    console.log("🎓 Final domainMatchCondition:", domainMatchCondition);
+
+    // STEP 5 — Fetch All Other Reports
     let otherReports = await PersonalityReport.find({
       userId: { $ne: userId },
     })
       .populate({
         path: "userId",
-        select: "_id gender emailDomain",
         model: "User",
+        select: "_id gender emailDomain privacy deleted",
         match: {
-          ...genderFilter, // Opposite gender
-          ...domainFilter, // ✅ Same email domain
+          deleted: false,
+          ...genderFilter,
+          ...domainMatchCondition,
         },
       })
       .lean();
 
-    console.log(
-      "✅ Found",
-      otherReports.length,
-      "other reports (before filtering)"
-    );
+    console.log("📌 Found reports:", otherReports.length);
 
-    // Step 6: Defensive filtering: keep only reports where userId is populated
-    otherReports = otherReports.filter((report) => report.userId != null);
-    console.log(
-      "✅ After filtering null userId:",
-      otherReports.length,
-      "reports"
-    );
+    // Filter out null userId
+    otherReports = otherReports.filter((r) => r.userId !== null);
+
+    console.log("📌 Valid reports:", otherReports.length);
 
     if (otherReports.length === 0) {
-      console.warn("⚠️ No users found with same domain and opposite gender");
       return res.json({
         success: true,
         matches: [],
         total: 0,
-        userGender: currentUser.gender,
-        userEmailDomain: currentUser.emailDomain,
-        message: `No ${
-          normalizeGender(currentUser.gender) === "male" ? "female" : "male"
-        } users found from your college (${currentUser.emailDomain})`,
       });
     }
 
-    // Step 7: Get profiles for valid user IDs
-    const userIds = otherReports.map((report) => report.userId._id);
-    const profiles = await Profile.find({ user: { $in: userIds } })
-      .select(
-        "user name age gender bio profilePic interests branch course year location preference"
-      )
-      .lean();
+    // STEP 6 — Load Profiles
+    for (let r of otherReports) {
+      const profile = await Profile.findOne({ user: r.userId._id })
+        .select(
+          "name age gender bio profilePic interests branch course year location preference",
+        )
+        .lean();
 
-    console.log("✅ Found", profiles.length, "profiles");
-
-    // Step 8: Map profiles by userId for quick lookup
-    const profileMap = new Map();
-    profiles.forEach((profile) => {
-      if (profile.user) {
-        profileMap.set(profile.user.toString(), profile);
-      }
-    });
-
-    // Step 9: Merge profiles into reports and filter valid
-    const validReports = otherReports
-      .map((report) => ({
-        ...report,
-        profile: profileMap.get(report.userId._id.toString()) || null,
-      }))
-      .filter((report) => {
-        if (!report.profile) {
-          console.warn(
-            "⚠️ Report missing profile for userId:",
-            report.userId._id
-          );
-          return false;
-        }
-        if (!report.bigFive) {
-          console.warn(
-            "⚠️ Report missing bigFive for userId:",
-            report.userId._id
-          );
-          return false;
-        }
-        if (!report.profile.name) {
-          console.warn(
-            "⚠️ Profile missing name for userId:",
-            report.userId._id
-          );
-          return false;
-        }
-        return true;
-      });
-
-    console.log(`✅ Valid reports after filtering: ${validReports.length}`);
-
-    if (validReports.length === 0) {
-      console.warn("⚠️ No valid opposite gender users found from same domain");
-      return res.json({
-        success: true,
-        matches: [],
-        total: 0,
-        userGender: currentUser.gender,
-        userEmailDomain: currentUser.emailDomain,
-        message: `No ${
-          normalizeGender(currentUser.gender) === "male" ? "female" : "male"
-        } users found from your college (${currentUser.emailDomain})`,
-      });
+      r.profile = profile || {
+        name: "Unknown",
+        age: null,
+        gender: "Other",
+        bio: "",
+        profilePic: null,
+        interests: [],
+      };
     }
 
-    // Step 10: Score matches
+    // STEP 8 — Score Matches
     const scoredMatches = matcher.scoreAllMatches(
       myReport.bigFive,
-      validReports
+      otherReports,
     );
-    console.log(`✅ Scored ${scoredMatches.length} matches`);
 
-    // Step 11: Format matches with profiles
-    const topMatches = scoredMatches
-      .slice(0, 50)
-      .map((match, idx) => {
-        try {
-          const { profile } = match;
-          const userId = match.userId._id || match.userId;
+    // ⭐ Attach profile back (fix the crash)
+    scoredMatches.forEach((m) => {
+      const original = otherReports.find(
+        (o) => o.userId._id.toString() === m.userId._id.toString(),
+      );
+      m.profile = original.profile;
+    });
+
+    // STEP 9 — Format Output
+    const topMatches = await Promise.all(
+      scoredMatches.slice(0, 50).map(async (match, idx) => {
+        const p = match.profile;
+
+        // ⭐ FIX: compute chat status here
+        let chatStatus = "NONE";
+
+        const chatMeta = await Chat.findOne({
+          participants: { $all: [userId, match.userId._id] },
+        });
+
+        if (chatMeta) chatStatus = chatMeta.status;
 
         return {
-  userId: userId.toString(),
-  name: profile.name || "Unknown User",
-  age: profile.age || null,
-  gender: profile.gender || null,
-  bio: profile.bio || "",
-  profilePic: profile.profilePic || null,
-  interests: profile.interests || [],
-  branch: profile.branch || null,
-  course: profile.course || null,
-  year: profile.year || null,
-  location: profile.location || null,
-  preference: profile.preference || "Any",
-  emailDomain: match.userId.emailDomain || null,
-  compatibility: Math.round(match.compatibility) || 0,
-  category: matcher.categorizeMatch
-    ? matcher.categorizeMatch(match.compatibility)
-    : "Unknown",
-  interpretation: match.interpretation || "Compatible match",
-  strengths: (match.details?.strengthAreas || []).slice(0, 2),
-  challenges: (match.details?.challengeAreas || []).slice(0, 2),
+          userId: match.userId._id.toString(),
+          name: p.name,
+          age: p.age,
+          gender: p.gender,
+          bio: p.bio,
+          profilePic: p.profilePic,
+          interests: p.interests || [],
+          branch: p.branch || null,
+          course: p.course || null,
+          year: p.year || null,
+          location: p.location || null,
+          preference: p.preference || "Any",
 
-  // 🔒 ADD THIS
-  isLocked: !premiumUser && idx >= 2,
-};
+          emailDomain: match.userId.emailDomain,
+          privacy: match.userId.privacy,
 
+          chatStatus, // ⭐ NOW VALID
 
-        } catch (e) {
-          console.error(`❌ Error formatting match #${idx}`, e);
-          return null;
-        }
-      })
-      .filter((m) => m !== null);
+          compatibility: Math.round(match.compatibility),
+          strengths: (match.details?.strengthAreas || []).slice(0, 2),
+          challenges: (match.details?.challengeAreas || []).slice(0, 2),
 
-    console.log(
-      `✅ Successfully formatted ${topMatches.length} matches for response`
-    );
-    console.log(
-      `📊 All matches from domain: ${currentUser.emailDomain}`,
-      topMatches.map((m) => ({ name: m.name, domain: m.emailDomain }))
+          isLocked: !premiumUser && idx >= 2,
+        };
+      }),
     );
 
+    console.log("✅ FINAL MATCH COUNT:", topMatches.length);
+
+    // STEP 10 — Send Response
     res.json({
       success: true,
-      isPremium: premiumUser,
       matches: topMatches,
+      isPremium: premiumUser,
       total: topMatches.length,
-      userGender: currentUser.gender,
-      userEmailDomain: currentUser.emailDomain,
-      message: `Found ${topMatches.length} compatible ${
-        normalizeGender(currentUser.gender) === "male" ? "female" : "male"
-      } matches from your college`,
     });
   } catch (err) {
     console.error("❌ Error in all-matches:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to fetch matches: " + err.message });
+    res.status(500).json({
+      error: "Failed to fetch matches: " + err.message,
+    });
   }
 });
 
@@ -470,7 +422,8 @@ router.get("/matches-by-range", protect, async (req, res) => {
     const userId = req.user._id;
 
     // Get current user and their gender & emailDomain
-    const currentUser = await User.findById(userId);
+    const currentUser = await User.findOne({ _id: userId, deleted: false });
+
     if (!currentUser) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -499,6 +452,7 @@ router.get("/matches-by-range", protect, async (req, res) => {
         path: "userId",
         model: "User",
         match: {
+          deleted: false,
           ...genderFilter,
           ...domainFilter, // ✅ Add domain filter
         },
@@ -511,11 +465,11 @@ router.get("/matches-by-range", protect, async (req, res) => {
 
     const scoredMatches = matcher.scoreAllMatches(
       myReport.bigFive,
-      validReports
+      validReports,
     );
 
     const filtered = scoredMatches.filter(
-      (m) => m.compatibility >= minCompat && m.compatibility <= maxCompat
+      (m) => m.compatibility >= minCompat && m.compatibility <= maxCompat,
     );
 
     const results = filtered.map((match) => ({
@@ -539,106 +493,168 @@ router.get("/matches-by-range", protect, async (req, res) => {
   }
 });
 
-router.get("/debug/all-matches-debug", protect, async (req, res) => {
+// ============================================================================
+// GET: Get all matches for current user (sorted by compatibility)
+// ============================================================================
+
+router.get("/all-matches", protect, async (req, res) => {
   try {
-    console.log("🔍 DEBUG: Starting all-matches debug");
+    console.log("🔍 Fetching all matches for user:", req.user._id);
+
     const userId = req.user._id;
-    console.log("✅ Got userId:", userId);
 
-    // Get current user
-    const currentUser = await User.findById(userId);
-    console.log("✅ Current user gender:", currentUser?.gender);
-    console.log("✅ Current user emailDomain:", currentUser?.emailDomain); // ✅ Debug domain
+    // Step 1: Get current user
+    const currentUser = await User.findOne({ _id: userId });
 
-    // Get current user's personality report
-    const myReport = await PersonalityReport.findOne({ userId });
-    console.log("✅ Got myReport:", !!myReport);
-    console.log("   - Has bigFive:", !!myReport?.bigFive);
-    console.log("   - BigFive scores:", myReport?.bigFive);
-
-    if (!myReport) {
-      return res.status(404).json({ error: "No report found" });
+    if (!currentUser) {
+      return res.status(404).json({ error: "User not found" });
     }
 
-    // Get opposite gender filter
-    const genderFilter = getOppositeGenderFilter(currentUser?.gender);
-    console.log("🔍 Gender filter:", genderFilter);
+    const premiumUser = isUserPremium(currentUser);
 
-    // ✅ Get domain filter
-    const domainFilter = { emailDomain: currentUser?.emailDomain };
-    console.log("🎓 Domain filter:", domainFilter);
+    // Step 2: Get personality report
+    const myReport = await PersonalityReport.findOne({ userId });
+    if (!myReport) {
+      return res.status(404).json({
+        error: "Please complete personality assessment first",
+      });
+    }
 
-    // Get all other users' reports WITH gender filter AND domain filter
-    console.log("🔍 Fetching all other reports with gender + domain filters...");
-    const otherReports = await PersonalityReport.find({
+    // Step 3: Get opposite gender filter
+    const genderFilter = getOppositeGenderFilter(currentUser.gender);
+
+    // =============================================================
+    // DOMAIN VISIBILITY LOGIC
+    // =============================================================
+    const isGmail = currentUser.emailDomain === "gmail.com";
+    const isPublic = currentUser.privacy === "public";
+    const userDomain = currentUser.emailDomain;
+
+    let domainMatchCondition = {};
+
+    if (isGmail) {
+      if (isPublic) {
+        domainMatchCondition = {
+          $or: [{ privacy: "public" }, { emailDomain: "gmail.com" }],
+        };
+      } else {
+        domainMatchCondition = { emailDomain: "gmail.com" };
+      }
+    } else {
+      if (isPublic) {
+        domainMatchCondition = {
+          $or: [{ emailDomain: userDomain }, { privacy: "public" }],
+        };
+      } else {
+        domainMatchCondition = { emailDomain: userDomain };
+      }
+    }
+
+    console.log("🎓 Final domainMatchCondition:", domainMatchCondition);
+
+    // Step 4: Fetch opposite gender users from allowed domains
+    let otherReports = await PersonalityReport.find({
       userId: { $ne: userId },
     })
       .populate({
         path: "userId",
+        select: "_id gender emailDomain privacy deleted",
         model: "User",
         match: {
+          deleted: false,
           ...genderFilter,
-          ...domainFilter, // ✅ Add domain filter
+          ...domainMatchCondition,
         },
-        select: "name gender emailDomain",
       })
       .lean();
 
-    console.log("✅ Found", otherReports.length, "other reports");
+    // Step 5: Remove nulls
+    otherReports = otherReports.filter((r) => r.userId != null);
 
-    // Filter nulls
-    const validReports = otherReports.filter((r) => r.userId != null);
-    console.log(
-      "✅ After filtering null userId:",
-      validReports.length,
-      "reports"
-    );
-
-    // Check structure of first report
-    if (validReports.length > 0) {
-      console.log("📋 First report structure:", {
-        userId: validReports[0].userId,
-        emailDomain: validReports[0].userId?.emailDomain,
-        hasBigFive: !!validReports[0].bigFive,
-        bigFiveKeys: validReports[0].bigFive
-          ? Object.keys(validReports[0].bigFive)
-          : "N/A",
+    if (otherReports.length === 0) {
+      return res.json({
+        success: true,
+        matches: [],
+        total: 0,
+        message: "No matches found",
       });
     }
 
-    // Check if matcher exists
-    console.log("🔍 Checking matcher...");
-    console.log("✅ Matcher functions:", {
-      hasScoreAllMatches: typeof matcher.scoreAllMatches,
-      hasCategorizeMatch: typeof matcher.categorizeMatch,
+    // Step 6: Load profiles (optional)
+    for (let vr of otherReports) {
+      const p = await Profile.findOne({ user: vr.userId._id }).lean();
+      vr.profile = p || {};
+    }
+
+    // Step 7: Normalize missing profile fields
+    for (let vr of otherReports) {
+      if (!vr.profile) vr.profile = {};
+      vr.profile.name = vr.profile.name || "Unknown";
+      vr.profile.age = vr.profile.age || null;
+      vr.profile.gender = vr.profile.gender || "Other";
+      vr.profile.bio = vr.profile.bio || "";
+      vr.profile.profilePic = vr.profile.profilePic || null;
+      vr.profile.interests = vr.profile.interests || [];
+      vr.profile.branch = vr.profile.branch || "";
+      vr.profile.course = vr.profile.course || "";
+      vr.profile.year = vr.profile.year || null;
+      vr.profile.location = vr.profile.location || "";
+      vr.profile.preference = vr.profile.preference || "Any";
+    }
+
+    // Step 8: Score matches
+    const scoredMatches = matcher.scoreAllMatches(
+      myReport.bigFive,
+      otherReports,
+    );
+
+    // Step 9: Format matches
+    const topMatches = scoredMatches.slice(0, 50).map((match, idx) => {
+      const p = match.profile || {};
+
+      return {
+        userId: match.userId._id.toString(),
+        name: p.name || "Unknown",
+        age: p.age || null,
+        gender: p.gender || null,
+        bio: p.bio || "",
+        profilePic: p.profilePic || null,
+        interests: p.interests || [],
+        branch: p.branch || null,
+        course: p.course || null,
+        year: p.year || null,
+        location: p.location || null,
+        preference: p.preference || "Any",
+
+        // required
+        emailDomain: match.userId.emailDomain,
+        privacy: match.userId.privacy,
+
+        // FIX → always NONE (no ChatRequest system)
+        chatStatus: "NONE",
+
+        compatibility: Math.round(match.compatibility) || 0,
+        category: matcher.categorizeMatch
+          ? matcher.categorizeMatch(match.compatibility)
+          : "Unknown",
+        interpretation: match.interpretation || "Compatible match",
+
+        strengths: (match.details?.strengthAreas || []).slice(0, 2),
+        challenges: (match.details?.challengeAreas || []).slice(0, 2),
+
+        isLocked: !premiumUser && idx >= 2,
+      };
     });
 
     res.json({
       success: true,
-      debug: {
-        currentUserGender: currentUser?.gender,
-        currentUserEmailDomain: currentUser?.emailDomain,
-        genderFilter: genderFilter,
-        domainFilter: domainFilter,
-        userFound: !!myReport,
-        otherReportsCount: otherReports.length,
-        validReportsCount: validReports.length,
-        firstValidReportUserId: validReports[0]?.userId,
-        firstValidReportDomain: validReports[0]?.userId?.emailDomain,
-        myReportBigFive: myReport.bigFive,
-      },
+      isPremium: premiumUser,
+      matches: topMatches,
+      total: topMatches.length,
     });
   } catch (err) {
-    console.error("❌ Debug error:", {
-      message: err.message,
-      stack: err.stack,
-      name: err.name,
-    });
-    res.status(500).json({
-      error: err.message,
-      type: err.name,
-      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-    });
+    console.error("❌ Error in all-matches:", err);
+    res.status(500).json({ error: "Failed to fetch matches: " + err.message });
   }
 });
 
@@ -661,7 +677,7 @@ router.get("/details/:otherUserId", protect, async (req, res) => {
 
     const result = matcher.calculateCompatibility(
       myReport.bigFive,
-      otherReport.bigFive
+      otherReport.bigFive,
     );
 
     res.json({

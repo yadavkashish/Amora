@@ -3,12 +3,30 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Menu, X, Sparkles, LogOut, User, MessageCircle, LayoutDashboard } from "lucide-react";
+import {
+  Menu,
+  X,
+  Sparkles,
+  LogOut,
+  User,
+  MessageCircle,
+  LayoutDashboard,
+  Bell,
+  Settings,
+} from "lucide-react";
+import NotificationsDropdown from "./NotificationsDropdown";
+import axios from "axios";
+import { playNotificationSound } from "../utils/playSound";
 
-/**
- * Glass Button Component (Mini version of the Home Page buttons)
- */
-const GlassButton = ({ children, onClick, className = "", variant = "primary" }) => {
+/* ------------------------------------------------------------
+   GLASS BUTTON
+------------------------------------------------------------ */
+const GlassButton = ({
+  children,
+  onClick,
+  className = "",
+  variant = "primary",
+}) => {
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
@@ -16,9 +34,11 @@ const GlassButton = ({ children, onClick, className = "", variant = "primary" })
       onClick={onClick}
       className={`
         relative px-5 py-2 rounded-full font-medium text-sm transition-all duration-300 border
-        ${variant === "primary" 
-          ? "bg-white/10 hover:bg-white/20 border-white/10 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]" 
-          : "bg-transparent hover:bg-white/5 border-transparent hover:border-white/10 text-zinc-400 hover:text-white"}
+        ${
+          variant === "primary"
+            ? "bg-white/10 hover:bg-white/20 border-white/10 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]"
+            : "bg-transparent hover:bg-white/5 border-transparent hover:border-white/10 text-zinc-400 hover:text-white"
+        }
         ${className}
       `}
     >
@@ -27,168 +47,289 @@ const GlassButton = ({ children, onClick, className = "", variant = "primary" })
   );
 };
 
+/* ------------------------------------------------------------
+   HEADER
+------------------------------------------------------------ */
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL;
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadNotif, setUnreadNotif] = useState(0);
 
-  // Handle Scroll Effect for Navbar Background
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  const [muteSound, setMuteSound] = useState(
+    localStorage.getItem("muteNotificationSound") === "true"
+  );
+
+  /* ------------------------------------------------------------
+     LOAD UNREAD COUNT (with sound for new count)
+  ------------------------------------------------------------ */
+  const loadUnread = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/notifications/unread/count`, { withCredentials: true })
+
+
+      const count = res.data.count || 0;
+
+      setUnreadNotif((prev) => {
+        if (!muteSound && count > prev) {
+          playNotificationSound();
+        }
+        return count;
+      });
+    } catch (err) {
+      console.error("Unread notif fetch failed:", err);
+    }
+  };
+
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
+    loadUnread();
+    const interval = setInterval(loadUnread, 10000);
+    return () => clearInterval(interval);
+  }, [muteSound]);
+
+  /* ------------------------------------------------------------
+     SOUND TOGGLE
+  ------------------------------------------------------------ */
+  const toggleNotificationSound = () => {
+    const updated = !muteSound;
+    setMuteSound(updated);
+    localStorage.setItem("muteNotificationSound", updated);
+  };
+
+  /* ------------------------------------------------------------
+     SCROLL EFFECT
+  ------------------------------------------------------------ */
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Check Auth
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/auth/me`, {
-          method: "GET",
-          credentials: "include",
-        });
+  /* ------------------------------------------------------------
+     CHECK AUTH STATUS
+  ------------------------------------------------------------ */
+ useEffect(() => {
+  // Pages where we MUST NOT call /me
+  const publicPages = ["/login", "/signup", "/account-deleted", "/forgot", "/reset-password"];
 
-        if (res.ok) {
-          const data = await res.json();
-          setIsLoggedIn(!!data.user);
-        } else {
-          setIsLoggedIn(false);
-        }
-      } catch (err) {
-        console.error("Auth check failed:", err);
-        setIsLoggedIn(false);
+  if (publicPages.includes(location.pathname)) {
+    setIsLoggedIn(false);  // avoid rendering logged-in UI
+    return;
+  }
+
+  const checkAuth = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/me`, {
+        credentials: "include",
+      });
+
+      // Retry for missing cookie
+      if (res.status === 401 || res.status === 403) {
+        setTimeout(checkAuth, 200);
+        return;
       }
-    };
 
-    checkAuth();
-  }, [location.pathname, API_URL]);
+      // Only redirect if truly deleted AND user is NOT on login/signup
+      if (res.status === 410) {
+        navigate("/account-deleted");
+        return;
+      }
 
-  // Logout Logic
+      if (!res.ok) {
+        setIsLoggedIn(false);
+        return;
+      }
+
+      const data = await res.json();
+      setIsLoggedIn(!!data.user);
+    } catch (err) {
+      setIsLoggedIn(false);
+    }
+  };
+
+  checkAuth();
+}, [location.pathname]);
+
+
+
+  /* ------------------------------------------------------------
+     LOGOUT
+  ------------------------------------------------------------ */
   const handleLogout = async () => {
-  try {
     await fetch(`${API_URL}/api/auth/logout`, {
       method: "POST",
       credentials: "include",
     });
 
-    // clear client state
     localStorage.clear();
     sessionStorage.clear();
 
-    setIsLoggedIn(false);
-    setMobileMenuOpen(false);
-
-    // prevent back button auth ghost
     navigate("/login", { replace: true });
-
-    // hard reset React memory
     window.location.reload();
-  } catch (err) {
-    console.error("Logout failed:", err);
-  }
-};
+  };
 
-
-  /**
-   * Navigation Links
-   */
+  /* ------------------------------------------------------------
+     NAV LINKS
+  ------------------------------------------------------------ */
   const NavLinks = ({ isMobile = false }) => (
-    <div className={`flex ${isMobile ? "flex-col gap-4" : "items-center gap-6"}`}>
+    <div
+      className={`flex ${isMobile ? "flex-col gap-4" : "items-center gap-6"}`}
+    >
       {!isLoggedIn ? (
         <>
-          <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-            <GlassButton variant="ghost" className={isMobile ? "w-full justify-start" : ""}>
-              Login
-            </GlassButton>
+          <Link to="/login">
+            <GlassButton variant="ghost">Login</GlassButton>
           </Link>
-          <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
-            <GlassButton variant="ghost" className={isMobile ? "w-full justify-center" : ""}>
-              Sign Up
-            </GlassButton>
+          <Link to="/signup">
+            <GlassButton variant="ghost">Sign Up</GlassButton>
           </Link>
         </>
       ) : (
         <>
-          <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
-            <GlassButton variant="ghost" className={`flex items-center gap-2 ${isMobile ? "w-full" : ""}`}>
+          <Link to="/dashboard">
+            <GlassButton variant="ghost" className="flex items-center gap-2">
               <LayoutDashboard size={16} /> Dashboard
             </GlassButton>
           </Link>
-          
-          <Link to="/chat" onClick={() => setMobileMenuOpen(false)}>
-             <GlassButton variant="ghost" className={`flex items-center gap-2 ${isMobile ? "w-full" : ""}`}>
+
+          <Link to="/chat">
+            <GlassButton variant="ghost" className="flex items-center gap-2">
               <MessageCircle size={16} /> Chats
             </GlassButton>
           </Link>
 
-          <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>
-             <GlassButton variant="ghost" className={`flex items-center gap-2 ${isMobile ? "w-full" : ""}`}>
+          <Link to="/profile">
+            <GlassButton variant="ghost" className="flex items-center gap-2">
               <User size={16} /> Profile
             </GlassButton>
           </Link>
 
-          <GlassButton 
-            onClick={handleLogout} 
-            variant="ghost" 
-            className={`text-red-400 hover:text-red-300 hover:bg-red-500/10 hover:border-red-500/20 flex items-center gap-2 ${isMobile ? "w-full" : ""}`}
+          {/* 🔔 Notifications Button */}
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/10 relative"
           >
-            <LogOut size={16} /> Logout
-          </GlassButton>
+            <div className="relative">
+              <Bell size={20} className="text-zinc-300" />
+
+              {unreadNotif > 0 && (
+                <span className="absolute -top-1 -right-1 bg-pink-500 text-[10px] font-bold text-white w-5 h-5 flex items-center justify-center rounded-full">
+                  {unreadNotif}
+                </span>
+              )}
+            </div>
+
+            <span className="text-zinc-300 text-sm">Notifications</span>
+          </button>
+
+          {/* Menu Button */}
+          <button
+            onClick={() => setShowMoreMenu(true)}
+            className="p-2 rounded-full hover:bg-white/10"
+          >
+            <Menu size={22} className="text-zinc-300" />
+          </button>
         </>
       )}
     </div>
   );
 
+  /* ------------------------------------------------------------
+     RETURN JSX
+  ------------------------------------------------------------ */
   return (
     <>
+      {/* HEADER */}
       <motion.header
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 border-b ${
           scrolled
-            ? "bg-[#05030a]/80 backdrop-blur-xl border-white/10 py-3 shadow-lg shadow-purple-900/5"
-            : "bg-transparent border-transparent py-5"
+            ? "bg-[#05030a]/80 backdrop-blur-xl border-white/10 py-3"
+            : "py-5 bg-transparent border-transparent"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          
-          {/* Logo Section */}
+          {/* LOGO */}
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="relative w-8 h-8 flex items-center justify-center bg-gradient-to-tr from-pink-500 to-purple-600 rounded-lg group-hover:rotate-12 transition-transform duration-300">
+            <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:rotate-12 transition">
               <Sparkles className="text-white w-5 h-5" />
             </div>
-            <h1 className="text-2xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-pink-100 to-purple-200">
+            <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-purple-200">
               AMORA
             </h1>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* NAV LINKS */}
           <nav className="hidden md:block">
             <NavLinks />
           </nav>
 
-          {/* Mobile Menu Toggle */}
+          {/* MOBILE MENU TOGGLE */}
           <button
-            className="md:hidden p-2 rounded-full bg-white/5 border border-white/10 text-zinc-200 hover:bg-white/10 transition-colors"
+            className="md:hidden p-2 rounded-full bg-white/5 border border-white/10 text-zinc-200 hover:bg-white/10"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
+
+        {/* NOTIFICATION DROPDOWN */}
+        {showNotifications && (
+          <NotificationsDropdown onClose={() => setShowNotifications(false)} />
+        )}
+
+        {/* MORE MENU */}
+        {showMoreMenu && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
+            <div className="w-72 bg-[#0d0b10] h-full border-l border-white/10 p-6 flex flex-col">
+              <h2 className="text-xl font-semibold text-white mb-6">More</h2>
+
+              <Link
+                to="/settings"
+                onClick={() => setShowMoreMenu(false)}
+                className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/5 text-zinc-300"
+              >
+                <Settings size={18} />
+                Settings
+              </Link>
+
+              <button
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  handleLogout();
+                }}
+                className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/5 text-zinc-300"
+              >
+                <LogOut size={18} />
+                Logout
+              </button>
+
+              <div className="mt-auto">
+                <button
+                  onClick={() => setShowMoreMenu(false)}
+                  className="w-full mt-4 py-2 text-center text-zinc-400 bg-white/5 rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </motion.header>
 
-      {/* Mobile Menu Drawer */}
+      {/* MOBILE DRAWER */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -197,7 +338,6 @@ export default function Header() {
               onClick={() => setMobileMenuOpen(false)}
             />
 
-            {/* Drawer */}
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
@@ -207,22 +347,15 @@ export default function Header() {
             >
               <div className="flex justify-between items-center mb-10">
                 <span className="text-lg font-bold text-white">Menu</span>
-                <button 
+                <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white"
                 >
                   <X size={20} />
                 </button>
               </div>
-              
-              <NavLinks isMobile={true} />
 
-              {/* Decorative bottom element */}
-              <div className="mt-auto pt-6 border-t border-white/5">
-                <p className="text-xs text-center text-zinc-600">
-                  Find your connection.
-                </p>
-              </div>
+              <NavLinks isMobile />
             </motion.div>
           </>
         )}
