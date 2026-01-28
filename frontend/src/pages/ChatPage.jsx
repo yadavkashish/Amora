@@ -102,7 +102,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen pl-80 pr-80 pt-14 flex bg-[#05030a] text-white overflow-hidden">
+    <div className="h-screen pt-14 flex bg-[#05030a] text-white overflow-hidden">
       {/* ================= LEFT SIDEBAR ================= */}
       <div className="w-[360px] border-r border-white/10 flex flex-col">
         {/* Tabs */}

@@ -100,13 +100,18 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   // ✅ Listen for new messages in real-time
   useEffect(() => {
     const handleNewMessage = (msg) => {
-      // ❌ If THEY blocked me → I shouldn't receive the message
+      // 🚫 If the message was NOT delivered (blocked), do not show it
+      if (msg.delivered === false && msg.receiver === currentUserId) {
+        return;
+      }
+
+      // 🚫 If THEY blocked me → I shouldn't receive
       if (IAmBlocked) return;
 
-      // ❌ If I blocked them → I shouldn't receive their message
+      // 🚫 If I blocked them → I shouldn't receive their messages
       if (isBlocked && msg.sender === selectedUser._id) return;
 
-      // normal chat delivery
+      // ✅ Normal message flow
       if (
         msg.sender === selectedUser._id ||
         msg.receiver === selectedUser._id

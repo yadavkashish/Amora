@@ -18,12 +18,7 @@ export default function UserProfileOptionsModal({ open, onClose, onDelete, onLog
 
       <div className="w-80 bg-[#1a1a22] rounded-2xl overflow-hidden border border-white/10">
 
-        {options.map((label, i) => (
-          <React.Fragment key={i}>
-            <OptionItem label={label} />
-            <Divider />
-          </React.Fragment>
-        ))}
+        
 
         <OptionItem label="Delete Account" danger onClick={onDelete} />
         <Divider />

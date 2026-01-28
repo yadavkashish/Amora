@@ -213,25 +213,24 @@ router.get("/", async (req, res) => {
         );
 
         return {
-  _id: otherUserId,
-  name,
-  profilePic,
-  isDeleted,
+          _id: otherUserId,
+          name,
+          profilePic,
+          isDeleted,
 
-  isBlocked: chat.status === "BLOCKED",
-  blockedBy: chat.blockedBy?.toString() || null,
+          isBlocked: chat.status === "BLOCKED",
+          blockedBy: chat.blockedBy?.toString() || null,
 
-  chatId: chat._id,
-  chatStatus: chat.status,
-  initiatedBy: chat.initiatedBy,
+          chatId: chat._id,
+          chatStatus: chat.status,
+          initiatedBy: chat.initiatedBy,
 
-  lastMessage: lastMsg?.content || "",
-  timestamp: lastMsg?.timestamp || chat.createdAt,
-  lastMessageSender: lastMsg?.sender?.toString() || null,
+          lastMessage: lastMsg?.content || "",
+          timestamp: lastMsg?.timestamp || chat.createdAt,
+          lastMessageSender: lastMsg?.sender?.toString() || null,
 
-  unreadCount: chat.status === "BLOCKED" ? 0 : read?.unreadCount || 0,
-};
-
+          unreadCount: chat.status === "BLOCKED" ? 0 : read?.unreadCount || 0,
+        };
       }),
     );
 
@@ -247,31 +246,32 @@ router.get("/:otherUserId", async (req, res) => {
   const otherUserId = req.params.otherUserId;
 
   const chat = await Chat.findOne({
-    participants: { $all: [currentUserId, otherUserId] },
+    participants: { $all: [currentUserId, otherUserId] }
   });
 
   if (!chat) return res.json([]);
 
-  // ❌ They blocked me → I must NOT see messages
-  // ❌ I blocked them → I must NOT see messages
-  if (chat.status === "BLOCKED") {
-    return res.json([]);
+  let messages = await Message.find({
+    $or: [
+      { sender: currentUserId, receiver: otherUserId },
+      { sender: otherUserId, receiver: currentUserId },
+    ],
+    deletedFor: { $ne: currentUserId }
+  }).sort({ timestamp: 1 });
+
+  // 🟥 If current user BLOCKED the other one → hide messages they sent after block
+  if (chat.status === "BLOCKED" && chat.blockedBy?.toString() === currentUserId.toString()) {
+    messages = messages.filter((m) => m.sender.toString() !== otherUserId);
   }
 
-  try {
-    const messages = await Message.find({
-      $or: [
-        { sender: currentUserId, receiver: otherUserId },
-        { sender: otherUserId, receiver: currentUserId },
-      ],
-      deletedFor: { $ne: currentUserId },
-    }).sort({ timestamp: 1 });
-
-    res.json(messages);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch messages" });
+  // 🟪 If current user IS BLOCKED by the other → hide messages sent AFTER block
+  if (chat.status === "BLOCKED" && chat.blockedBy?.toString() === otherUserId.toString()) {
+    messages = messages.filter((m) => m.sender.toString() !== otherUserId);
   }
+
+  res.json(messages);
 });
+
 
 router.post("/:receiverId", async (req, res) => {
   const senderId = req.user._id;
@@ -286,26 +286,8 @@ router.post("/:receiverId", async (req, res) => {
     return res.status(400).json({ error: "Chat does not exist" });
   }
 
-  // If YOU blocked them → you cannot send
-  if (
-    chat.status === "BLOCKED" &&
-    chat.blockedBy?.toString() === senderId.toString()
-  ) {
-    return res.status(403).json({ error: "You have blocked this user" });
-  }
-
-  // If chat is blocked
-  let delivered = true;
-
-  if (chat.status === "BLOCKED") {
-    // Do not deliver ANY message across blocked chat
-    delivered = false;
-  }
-
-  const receiver = await User.findOne({ _id: receiverId, deleted: false });
-  if (!receiver) {
-    return res.status(410).json({ error: "User does not exist" });
-  }
+  // ❌ Neither side can send messages in a blocked chat
+  let delivered = chat.status !== "BLOCKED";
 
   const msg = await Message.create({
     sender: senderId,
@@ -318,7 +300,7 @@ router.post("/:receiverId", async (req, res) => {
   chat.lastMessage = msg._id;
   await chat.save();
 
-  // Only deliver if allowed
+  // 🚫 Only deliver if not blocked
   if (delivered) {
     req.app.get("io").to(receiverId.toString()).emit("newMessage", msg);
   }

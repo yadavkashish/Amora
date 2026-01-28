@@ -19,7 +19,7 @@ router.get("/:otherUserId", async (req, res) => {
         { sender: currentUserId, receiver: otherUserId },
         { sender: otherUserId, receiver: currentUserId },
       ],
-      deletedFor: { $ne: currentUserId }
+      deletedFor: { $ne: currentUserId },
     }).sort({ timestamp: 1 });
 
     res.json(messages);
@@ -37,24 +37,15 @@ router.post("/:receiverId", async (req, res) => {
   const { content } = req.body;
 
   const chat = await Chat.findOne({
-    participants: { $all: [senderId, receiverId] }
+    participants: { $all: [senderId, receiverId] },
   });
 
   if (!chat) {
     return res.status(400).json({ error: "Chat does not exist" });
   }
 
-  // YOU BLOCKED THEM — cannot send
-  if (chat.status === "BLOCKED" && chat.blockedBy?.toString() === senderId.toString()) {
-    return res.status(403).json({ error: "You have blocked this user" });
-  }
-
-  let delivered = true;
-
-  // THEY BLOCKED YOU — message is saved but not delivered
-  if (chat.status === "BLOCKED" && chat.blockedBy?.toString() !== senderId.toString()) {
-    delivered = false;
-  }
+  // ❌ Neither side can send messages while blocked
+  let delivered = chat.status !== "BLOCKED";
 
   const msg = await Message.create({
     sender: senderId,
@@ -83,10 +74,11 @@ router.put("/seen/:otherUserId", async (req, res) => {
 
   await Message.updateMany(
     { sender: otherUserId, receiver: currentUserId, seen: false },
-    { $set: { seen: true } }
+    { $set: { seen: true } },
   );
 
-  req.app.get("io")
+  req.app
+    .get("io")
     .to(otherUserId.toString())
     .emit("seenMessage", { userId: currentUserId });
 
