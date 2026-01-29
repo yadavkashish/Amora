@@ -7,15 +7,8 @@ export default function SettingsSidebar() {
 
   const items = [
     { label: "Edit Profile", to: "/settings/profile" },
-    { label: "Notifications", to: "/settings/notifications" },
     { label: "Blocked Users", to: "/settings" }, // current one
-    { type: "section", label: "Privacy" },
     { label: "Account Privacy", to: "/settings/privacy" },
-    { label: "Story Controls", to: "/settings/story-controls" },
-    { type: "section", label: "How others interact" },
-    { label: "Messages & Replies", to: "/settings/messages" },
-    { label: "Comments", to: "/settings/comments" },
-    { label: "Tags & Mentions", to: "/settings/tags" },
   ];
 
   return (

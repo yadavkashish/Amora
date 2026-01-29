@@ -12,7 +12,7 @@ export default function ViewProfileOptionsModal({ open, onClose, onBlock }) {
         <Divider />
         <OptionItem label="Report" onClick={() => alert("Reporting...")} />
         <Divider />
-        <OptionItem label="Hide Profile" />
+        {/* <OptionItem label="Hide Profile" /> */}
         <Divider />
         <OptionItem label="Cancel" onClick={onClose} />
 
