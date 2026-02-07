@@ -22,6 +22,4 @@ services:
     container_name: amora-whatsapp
     env_file:
       - .env
-    environment:
-      - ENABLE_WHATSAPP_BOT=true
     restart: unless-stopped
