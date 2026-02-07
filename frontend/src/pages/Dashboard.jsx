@@ -264,77 +264,52 @@ export default function DashboardModern() {
     const signal = abortRef.current.signal;
 
     const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  try {
+    setLoading(true);
+    setError(null);
 
-        let meRes;
+    const [meRes, matchesRes] = await Promise.all([
+      axios.get(`${API_URL}/api/auth/me`, {
+        withCredentials: true,
+        signal,
+      }),
+      axios.get(`${API_URL}/api/compatibility/all-matches`, {
+        withCredentials: true,
+        signal,
+      })
+    ]);
 
-        try {
-          meRes = await axios.get(`${API_URL}/api/auth/me`, {
-            withCredentials: true,
-            signal,
-          });
-        } catch (err) {
-          const status = err.response?.status;
+    const user = meRes.data?.user;
 
-          // Cookie not yet set → retry
-          if (status === 401 || status === 403) {
-            setTimeout(fetchData, 300);
-            return;
-          }
+    if (!user) throw new Error("User not found");
+    if (user.deleted) {
+      navigate("/account-deleted");
+      return;
+    }
 
-          // Only redirect if server CONFIRMED delete
-          if (status === 410) {
-            navigate("/account-deleted");
-            return;
-          }
+    setMe(user);
 
-          throw err; // continue to outer catch
-        }
+    const payload = matchesRes.data;
+    const rawMatches = Array.isArray(payload)
+      ? payload
+      : payload?.matches || payload?.data || [];
 
-        const user = meRes.data?.user;
+    const normalized = rawMatches
+      .filter((m) => !m.isDeleted)
+      .map((m) => ({
+        ...m,
+        compatibility: Number(m.compatibility ?? 0),
+        chatStatus: m.chatStatus ?? "NONE",
+      }));
 
-        if (!user) {
-          // If backend didn't respond with user, retry
-          setTimeout(fetchData, 200);
-          return;
-        }
+    setMatches(normalized);
+    setLoading(false);
+  } catch (err) {
+    setError(err?.response?.data?.error || "Failed to load dashboard");
+    setLoading(false);
+  }
+};
 
-        if (user.deleted === true) {
-          navigate("/account-deleted");
-          return;
-        }
-
-        setMe(user);
-
-        // Now fetch matches
-        const matchesRes = await axios.get(
-          `${API_URL}/api/compatibility/all-matches`,
-          { withCredentials: true, signal },
-        );
-
-        const payload = matchesRes.data;
-        const rawMatches = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.matches)
-            ? payload.matches
-            : payload?.data || [];
-
-        const normalized = rawMatches
-          .filter((m) => !m.isDeleted)
-          .map((m) => ({
-            ...m,
-            compatibility: Number(m.compatibility ?? 0),
-            chatStatus: m.chatStatus ?? "NONE",
-          }));
-
-        setMatches(normalized);
-        setLoading(false);
-      } catch (err) {
-        setError(err.response?.data?.error || "Failed to load matches");
-      }
-    };
 
     fetchData();
 
@@ -576,7 +551,7 @@ export default function DashboardModern() {
       {/* --- Main Content Grid --- */}
       <div className="max-w-7xl mx-auto px-6">
         {/* Matches Grid */}
-        <AnimatePresence mode="wait">
+        <AnimatePresence  initial={false}>
           {filteredMatches.length > 0 ? (
             <motion.div
               key="grid"
