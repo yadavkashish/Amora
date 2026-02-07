@@ -5,18 +5,30 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const User = require("../models/User");
 
-const initBot = () => {
+const initBot = async () => {
+  await mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+
+  console.log("✅ WhatsApp bot connected to MongoDB");
+
   const store = new MongoStore({ mongoose: mongoose });
 
   const client = new Client({
     authStrategy: new RemoteAuth({
       store: store,
-      backupSyncIntervalMs: 300000
+      backupSyncIntervalMs: 300000,
     }),
     puppeteer: {
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-    }
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--single-process",
+      ],
+    },
   });
 
   client.on("qr", (qr) => {
@@ -57,15 +69,17 @@ const initBot = () => {
         if (codeMatch) {
           const shortId = codeMatch[1];
           console.log(`🔍 Looking for order with shortId: ${shortId}`);
-          
+
           const order = await Order.findOneAndUpdate(
             { shortId, status: "PENDING" },
             { phone: phone },
-            { new: true }
+            { new: true },
           );
 
           if (order) {
-            await msg.reply("🔗 *Order Linked!* Send the payment now. Premium will activate automatically.");
+            await msg.reply(
+              "🔗 *Order Linked!* Send the payment now. Premium will activate automatically.",
+            );
             console.log(`✅ Linked ${shortId} to ${phone}`);
           } else {
             await msg.reply("❌ Invalid or expired code. Please try again.");
@@ -76,14 +90,15 @@ const initBot = () => {
       }
 
       // --- STEP 2: PAYMENT DETECTION ---
-      const isPayment = msg.type === 'payment' || 
-                        (/Completed|Paid ₹|Success/i.test(body) && body.includes("₹"));
+      const isPayment =
+        msg.type === "payment" ||
+        (/Completed|Paid ₹|Success/i.test(body) && body.includes("₹"));
 
       if (isPayment) {
         console.log(`💰 Payment bubble detected from ${phone}`);
-        const order = await Order.findOne({ 
-          phone: phone, 
-          status: "PENDING" 
+        const order = await Order.findOne({
+          phone: phone,
+          status: "PENDING",
         }).sort({ createdAt: -1 });
 
         if (order) {
@@ -94,10 +109,14 @@ const initBot = () => {
           await User.findByIdAndUpdate(order.userId, {
             isPremium: true,
             subscriptionType: order.planType,
-            subscriptionExpiry: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+            subscriptionExpiry: new Date(
+              Date.now() + days * 24 * 60 * 60 * 1000,
+            ),
           });
 
-          await msg.reply("✅ *Payment received!* Premium is now active. Refresh your dashboard! 🚀");
+          await msg.reply(
+            "✅ *Payment received!* Premium is now active. Refresh your dashboard! 🚀",
+          );
           console.log(`✅ Activated Premium for ${order.userId}`);
         } else {
           console.log(`⚠️ No pending order found for phone: ${phone}`);
@@ -109,14 +128,13 @@ const initBot = () => {
       // if (body.toLowerCase() === "ping") {
       //   await msg.reply("🏓 Pong! Bot is working.");
       // }
-
     } catch (err) {
       console.error("❌ Bot Logic Error:", err);
     }
   });
 
   client.initialize();
-  
+
   return client; // Return client for potential external use
 };
 
