@@ -1,6 +1,5 @@
-FROM ghcr.io/puppeteer/puppeteer:18
+FROM ghcr.io/puppeteer/puppeteer:latest
 
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 WORKDIR /app
