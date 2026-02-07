@@ -6,6 +6,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 require("dotenv").config();
 const cors = require("cors");
+const helmet = require("helmet");
 
 // ---------------- ROUTES ----------------
 const compatibilityRoutes = require("./routes/compatibility");
@@ -19,6 +20,7 @@ const paymentRoutes = require("./routes/payment");
 
 // ---------------- APP INIT ----------------
 const app = express();
+app.use(helmet());
 const server = http.createServer(app);
 
 // ---------------- ALLOWED ORIGINS ----------------
@@ -30,25 +32,27 @@ const allowedOrigins = [
 ];
 
 // ---------------- CORS (FIXED) ----------------
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow Postman, curl
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow Postman, curl
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("CORS not allowed"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS not allowed"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 app.options("*", cors());
 
 // ---------------- BODY PARSERS ----------------
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
 // ---------------- SOCKET.IO ----------------
@@ -85,7 +89,7 @@ app.use("/api/personality", personalityRoutes);
 app.use("/api/payment", paymentRoutes);
 
 // ---------------- MONGO + SERVER START ----------------
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI;
 
 mongoose
@@ -93,8 +97,10 @@ mongoose
   .then(() => {
     console.log("✅ Connected to MongoDB");
 
-    const initBot = require("./whatsapp/bot");
-    initBot();
+    if (process.env.ENABLE_WHATSAPP_BOT === "true") {
+      const initBot = require("./whatsapp/bot");
+      initBot();
+    }
 
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on port ${PORT}`);
