@@ -139,4 +139,10 @@ const initBot = async () => {
 };
 
 // ✅ Auto-initialize when required (or export for manual init)
+initBot().catch(err => {
+  console.error("❌ WhatsApp bot startup failed:", err);
+  process.exit(1);
+});
+
 module.exports = initBot;
+
