@@ -21,15 +21,16 @@ const initBot = async () => {
       backupSyncIntervalMs: 300000,
     }),
     puppeteer: {
-      headless: true,
-      executablePath: "/usr/bin/google-chrome-stable",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--single-process",
-      ],
-    },
+  headless: true,
+  executablePath: "/usr/bin/chromium",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--single-process"
+  ]
+}
+
   });
 
   client.on("qr", (qr) => {
