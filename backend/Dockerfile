@@ -2,6 +2,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 COPY package*.json ./
 
 RUN npm install --production
