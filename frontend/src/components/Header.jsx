@@ -53,7 +53,10 @@ const GlassButton = ({
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

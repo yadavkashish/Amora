@@ -4,7 +4,10 @@ import axios from "axios";
 import { ChevronRight } from "lucide-react";
 import SettingsSidebar from "../components/SettingsSidebar";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
 export default function SettingsPage() {
   const [blockedUsers, setBlockedUsers] = useState([]);

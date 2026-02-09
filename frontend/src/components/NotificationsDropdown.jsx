@@ -2,7 +2,10 @@ import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { playNotificationSound } from "../utils/playSound";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
 export default function NotificationsDropdown({ onClose }) {
   const [notifs, setNotifs] = useState([]);

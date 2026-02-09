@@ -116,7 +116,10 @@ const ENNEAGRAM_NAMES = {
 export default function PersonalityReportPage() {
   const { userId } = useParams(); // optional route param
   const navigate = useNavigate();
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);

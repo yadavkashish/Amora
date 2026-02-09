@@ -66,9 +66,16 @@ for (const [, entry] of Object.entries(manifest)) {
 const PRECONNECT_ORIGINS = [
   "https://images.unsplash.com",
   "https://res.cloudinary.com",
-  "https://static.sketchfab.com",
-  "https://amora-mx7x.onrender.com",
+  "https://static.sketchfab.com"
 ].filter(Boolean);
+
+// const PRECONNECT_ORIGINS = [
+//   "https://images.unsplash.com",
+//   "https://res.cloudinary.com",
+//   "https://static.sketchfab.com",
+//   "https://amora-mx7x.onrender.com",
+// ].filter(Boolean);
+
 
 // Read and patch dist/index.html
 const indexHtmlPath = path.join(dist, "index.html");

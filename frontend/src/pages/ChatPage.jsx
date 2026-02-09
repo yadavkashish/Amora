@@ -5,7 +5,10 @@ import Chats from "../components/Chats";
 import ChatWindow from "../components/ChatWindow";
 import RequestsList from "../components/RequestsList"; // ⭐ IMPORTANT
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
 export default function ChatPage() {
   const [chatUsers, setChatUsers] = useState([]);

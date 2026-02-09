@@ -20,8 +20,10 @@ import {
 import { sendChatRequest } from "../api/chatApi";
 import MatchCard from "../components/MatchCard";
 
-const BASE_URL = import.meta.env.VITE_API_URL;
-const API_URL = `${BASE_URL}` || "http://localhost:5000";
+
+const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
 
 // --- THEME BACKGROUND (Shared) ---
 const BackgroundGrid = () => (
