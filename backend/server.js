@@ -30,7 +30,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-
 // ---------------- ALLOWED ORIGINS ----------------
 const allowedOrigins = [
   "http://localhost:5173",
@@ -117,3 +116,5 @@ mongoose
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err.message);
   });
+
+  
