@@ -23,6 +23,13 @@ const app = express();
 app.use(helmet());
 const server = http.createServer(app);
 
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    uptime: process.uptime()
+  });
+});
+
 // ---------------- ALLOWED ORIGINS ----------------
 const allowedOrigins = [
   "http://localhost:5173",
@@ -109,3 +116,5 @@ mongoose
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err.message);
   });
+
+  
