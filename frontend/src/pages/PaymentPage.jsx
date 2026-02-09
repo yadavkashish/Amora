@@ -8,7 +8,10 @@ export default function PaymentPage() {
     const [isWaiting, setIsWaiting] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState(null);
     const navigate = useNavigate();
-    const API_URL = import.meta.env.VITE_API_URL;
+    const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
     useEffect(() => {
         let interval;

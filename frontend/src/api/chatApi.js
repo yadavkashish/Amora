@@ -1,29 +1,24 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const api = axios.create({
+  baseURL: import.meta.env.DEV
+    ? "http://localhost:5000/api"
+    : "/api",
+  withCredentials: true,
+});
 
-// ONLY job: call backend
 export const sendChatRequest = async (receiverId, noteText = null) => {
-  return axios.post(
-    `${BASE_URL}/api/chat/request`,
-    { receiverId, note: noteText },
-    { withCredentials: true },
-  );
+  return api.post("/chat/request", {
+    receiverId,
+    note: noteText,
+  });
 };
 
 export const acceptChatRequest = (chatId) =>
-  axios.put(
-    `${BASE_URL}/api/chat/${chatId}/accept`,
-    {},
-    { withCredentials: true },
-  );
+  api.put(`/chat/${chatId}/accept`);
 
 export const blockChat = (chatId) =>
-  axios.put(
-    `${BASE_URL}/api/chat/${chatId}/block`,
-    {},
-    { withCredentials: true },
-  );
+  api.put(`/chat/${chatId}/block`);
 
 export const getMyChats = () =>
-  axios.get(`${BASE_URL}/api/chat`, { withCredentials: true });
+  api.get("/chat");

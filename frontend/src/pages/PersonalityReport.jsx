@@ -118,7 +118,10 @@ export default function PersonalityReportDisplay() {
   const [activeTab, setActiveTab] = useState(0);
   const [error, setError] = useState(null);
 
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
   const fetchReport = useCallback(async () => {
     try {
       setLoading(true);

@@ -29,7 +29,10 @@ export default function CompatibilityForm() {
   const [statusLoading, setStatusLoading] = useState(true);
   const navigate = useNavigate();
 
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
   // --- Build renderedQuestions: remove all individual dealbreaker entries and
   // replace with a single synthetic grouped dealbreaker question.

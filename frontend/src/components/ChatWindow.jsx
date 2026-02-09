@@ -28,7 +28,10 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   const bottomRef = useRef();
   const socket = getSocket();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
   const [showMenu, setShowMenu] = useState(false);
   const isBlocked = selectedUser.blockedBy === currentUserId;
   const IAmBlocked =
