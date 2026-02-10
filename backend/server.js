@@ -94,6 +94,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/compatibility", compatibilityRoutes);
 app.use("/api/personality", personalityRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api", require("./src/routes/uploads"));
 
 // ---------------- MONGO + SERVER START ----------------
 const PORT = process.env.PORT || 3000;
