@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { v4: uuid } = require("uuid");
+const { randomUUID } = require("crypto");
 const { createUploadUrl } = require("../lib/s3");
 
 router.post("/uploads/presign", async (req, res) => {
@@ -10,7 +10,8 @@ router.post("/uploads/presign", async (req, res) => {
       return res.status(400).json({ error: "contentType is required" });
     }
 
-    const key = `uploads/${Date.now()}-${uuid()}`;
+    const key = `uploads/${Date.now()}-${randomUUID()}`;
+
 
     const url = await createUploadUrl({
       key,
