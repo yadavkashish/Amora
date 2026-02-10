@@ -85,6 +85,7 @@ io.on("connection", (socket) => {
   });
 });
 
+
 // ---------------- ROUTES ----------------
 app.use("/api/users", userRoutes);
 app.use("/api/profile", profileRoutes);
