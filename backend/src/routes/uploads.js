@@ -1,9 +1,8 @@
 const router = require("express").Router();
 const { randomUUID } = require("crypto");
 const { createUploadUrl } = require("../lib/s3");
-const auth = require("../../middleware/auth");
 
-router.post("/uploads/presign", auth, async (req, res) => {
+router.post("/uploads/presign", async (req, res) => {
   try {
     const { contentType } = req.body;
 
