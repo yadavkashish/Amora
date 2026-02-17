@@ -389,7 +389,7 @@ export default function ViewProfile() {
 
   const handleBlockUser = async () => {
     try {
-      const base = (API_URL || "http://localhost:5000").replace(/\/$/, "");
+      const base = API_URL.replace(/\/$/, "");
 
       await axios.post(
         `${base}/api/chat/${userId}/block`,
