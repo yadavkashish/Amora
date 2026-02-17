@@ -243,7 +243,7 @@ export default function ViewProfile() {
       if (!userId) return;
       setLoading(true);
       setError(null);
-      const base = (API_URL || "http://localhost:5000").replace(/\/$/, "");
+      const base = API_URL.replace(/\/$/, "");
       try {
         let myId = null;
         try {
@@ -363,7 +363,7 @@ export default function ViewProfile() {
     profileFile,
     moreFiles = [],
   }) => {
-    const base = (API_URL || "http://localhost:5000").replace(/\/$/, "");
+    const base = API_URL.replace(/\/$/, "");
     const fd = new FormData();
     Object.entries(formFields).forEach(([k, v]) => {
       if (v == null) return;
