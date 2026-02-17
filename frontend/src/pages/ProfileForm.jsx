@@ -6,7 +6,10 @@ import { motion } from 'framer-motion';
 import { Heart, User, BookOpen, Camera, Send, CheckCircle, Loader, AlertCircle, XCircle } from 'lucide-react';
 import * as faceapi from 'face-api.js';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
+
 
 /* --- Framer Motion Variants --- */
 const containerVariants = {
