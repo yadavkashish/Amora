@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, User, BookOpen, Camera, Send, CheckCircle, Loader, AlertCircle, XCircle } from 'lucide-react';
 import * as faceapi from 'face-api.js';
+import Select from "react-select";
+import { City } from "country-state-city";
 
 const API_URL = import.meta.env.DEV
   ? "http://localhost:5000"
@@ -49,8 +51,16 @@ export default function ProfileForm() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '', age: '', gender: '', bio: '', preference: '',
-    location: '', interests: '', branch: '', course: '', year: '',
+    location: '', interests: '', course: '', year: '',
   });
+  const [gps, setGps] = useState(null);
+
+ const cityOptions = useMemo(() => {
+  return City.getCitiesOfCountry("IN").map((c) => ({
+    value: `${c.name}, ${c.stateCode}, ${c.countryCode}`,
+    label: `${c.name}, ${c.stateCode}, ${c.countryCode}`,
+  }));
+}, []);
 
   const [profilePicFile, setProfilePicFile] = useState(null);
   const [profilePreviewUrl, setProfilePreviewUrl] = useState(null);
@@ -66,6 +76,20 @@ export default function ProfileForm() {
   const verifyAbortRef = useRef(false);
 
   const MODELS_BASE = `${import.meta.env.BASE_URL || '/'}models`.replace(/\/+/g, '/');
+
+  useEffect(() => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      setGps({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+    },
+    () => {
+      console.log("Location permission denied");
+    }
+  );
+}, []);
 
   useEffect(() => {
     let mounted = true;
@@ -207,6 +231,8 @@ export default function ProfileForm() {
       return;
     }
 
+    
+
     setLoading(true);
     try {
       const data = new FormData();
@@ -223,6 +249,11 @@ export default function ProfileForm() {
 
       // append descriptor (so server can save encrypted descriptor to User)
       data.append('profileDescriptor', JSON.stringify(verifiedDescriptor));
+
+      if (gps) {
+  data.append("lat", gps.lat);
+  data.append("lng", gps.lng);
+}
 
       const res = await fetch(`${API_URL}/api/profile/create`, {
         method: 'POST',
@@ -329,7 +360,65 @@ export default function ProfileForm() {
 
               <div>
                 <label className={labelClass}>Location</label>
-                <input name="location" value={formData.location} onChange={handleChange} className={inputBaseClass} placeholder="City, Campus, etc." />
+
+<Select
+  options={cityOptions}
+  placeholder="Search city..."
+  value={
+    formData.location
+      ? { label: formData.location, value: formData.location }
+      : null
+  }
+  onChange={(selected) =>
+    setFormData((s) => ({
+      ...s,
+      location: selected?.value || "",
+    }))
+  }
+  isClearable
+
+  menuPortalTarget={document.body}
+  menuPosition="fixed"
+  menuPlacement="auto"
+
+  styles={{
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: 9999,
+    }),
+
+    menu: (base) => ({
+      ...base,
+      backgroundColor: "#111827",
+      color: "white",
+      maxHeight: 250,
+    }),
+
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isFocused ? "#7c3aed" : "#111827",
+      color: "white",
+      cursor: "pointer",
+    }),
+
+    control: (base) => ({
+      ...base,
+      backgroundColor: "transparent",
+      borderColor: "#374151",
+      minHeight: "48px",
+    }),
+
+    singleValue: (base) => ({
+      ...base,
+      color: "white",
+    }),
+
+    input: (base) => ({
+      ...base,
+      color: "white",
+    }),
+  }}
+/>
               </div>
             </InputGroup>
 
@@ -346,21 +435,6 @@ export default function ProfileForm() {
                     <option className="bg-gray-900">B.Pharma</option>
                     <option className="bg-gray-900">M.Pharma</option>
                     <option className="bg-gray-900">B.Arch</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Branch</label>
-                  <select name="branch" value={formData.branch} onChange={handleChange} className={inputBaseClass}>
-                    <option value="" className="bg-gray-900">Select Branch</option>
-                    <option className="bg-gray-900">CSE</option>
-                    <option className="bg-gray-900">CSE-AIML</option>
-                    <option className="bg-gray-900">CSE-AI</option>
-                    <option className="bg-gray-900">CSIT</option>
-                    <option className="bg-gray-900">IT</option>
-                    <option className="bg-gray-900">ECE</option>
-                    <option className="bg-gray-900">EEE</option>
-                    <option className="bg-gray-900">ME</option>
-                    <option className="bg-gray-900">Civil</option>
                   </select>
                 </div>
                 <div>

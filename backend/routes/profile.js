@@ -58,7 +58,7 @@ router.post(
       if (req.files?.profilePic?.[0]) {
         const up = await callUploadBuffer(
           req.files.profilePic[0].buffer,
-          "amora/profilePics"
+          "amora/profilePics",
         );
         profilePic = up.secure_url || up.url;
         profilePicPublicId = up.public_id || up.publicId || null;
@@ -70,8 +70,8 @@ router.post(
       if (req.files?.morePics?.length) {
         const uploads = await Promise.all(
           req.files.morePics.map((f) =>
-            callUploadBuffer(f.buffer, "amora/morePics")
-          )
+            callUploadBuffer(f.buffer, "amora/morePics"),
+          ),
         );
         uploads.forEach((u) => {
           morePics.push(u.secure_url || u.url);
@@ -85,7 +85,7 @@ router.post(
       if (req.files?.coverImage?.length) {
         const up = await callUploadBuffer(
           req.files.coverImage[0].buffer,
-          "amora/covers"
+          "amora/covers",
         );
         coverImage = up.secure_url || up.url;
         coverImagePublicId = up.public_id || up.publicId || null;
@@ -100,11 +100,17 @@ router.post(
         age: req.body.age,
         gender: req.body.gender,
         bio: req.body.bio,
-        branch: req.body.branch,
         course: req.body.course,
         year: req.body.year,
         preference: req.body.preference,
-        location: req.body.location,
+        location: {
+  city: req.body.location || "",
+},
+
+        currentLocation: {
+          type: "Point",
+          coordinates: [Number(req.body.lng), Number(req.body.lat)],
+        },
         interests,
         profilePic,
         profilePicPublicId,
@@ -145,7 +151,7 @@ router.post(
       console.error("❌ Profile creation error:", err);
       res.status(400).json({ success: false, error: err.message });
     }
-  }
+  },
 );
 
 /* =======================================================
@@ -189,8 +195,7 @@ router.post(
   async (req, res) => {
     try {
       const profile = await Profile.findById(req.params.id);
-      if (!profile)
-        return res.status(404).json({ error: "Profile not found" });
+      if (!profile) return res.status(404).json({ error: "Profile not found" });
 
       if (profile.user.toString() !== req.user._id.toString())
         return res.status(403).json({ error: "Unauthorized" });
@@ -199,7 +204,7 @@ router.post(
         return res.status(400).json({ error: "No files provided" });
 
       const uploads = await Promise.all(
-        req.files.map((f) => callUploadBuffer(f.buffer, "amora/morePics"))
+        req.files.map((f) => callUploadBuffer(f.buffer, "amora/morePics")),
       );
 
       uploads.forEach((u) => {
@@ -212,7 +217,7 @@ router.post(
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
-  }
+  },
 );
 
 /* =======================================================
@@ -225,14 +230,12 @@ router.put(
   async (req, res) => {
     try {
       const profile = await Profile.findById(req.params.id);
-      if (!profile)
-        return res.status(404).json({ error: "Profile not found" });
+      if (!profile) return res.status(404).json({ error: "Profile not found" });
 
       if (profile.user.toString() !== req.user._id.toString())
         return res.status(403).json({ error: "Unauthorized" });
 
-      if (!req.file)
-        return res.status(400).json({ error: "No file uploaded" });
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
       if (profile.coverImagePublicId) {
         try {
@@ -240,10 +243,7 @@ router.put(
         } catch (e) {}
       }
 
-      const up = await callUploadBuffer(
-        req.file.buffer,
-        "amora/covers"
-      );
+      const up = await callUploadBuffer(req.file.buffer, "amora/covers");
 
       profile.coverImage = up.secure_url || up.url;
       profile.coverImagePublicId = up.public_id || up.publicId || null;
@@ -253,7 +253,7 @@ router.put(
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
-  }
+  },
 );
 
 /* =======================================================
@@ -274,21 +274,22 @@ router.get("/all-profiles", protect, async (req, res) => {
       // Public users: Gmail + same domain only
       filter.$or = [
         { emailDomain: "gmail.com" },
-        { emailDomain: me.emailDomain }
+        { emailDomain: me.emailDomain },
       ];
     }
 
     // Additional UI-based filters (gender, year, etc)
-    const { gender, branch, course, year, interest } = req.query;
+    const { gender, course, year, interest } = req.query;
 
     if (gender) filter.gender = gender;
-    if (branch) filter.branch = branch;
     if (course) filter.course = course;
     if (year) filter.year = parseInt(year);
     if (interest) filter.interests = { $in: [interest] };
 
     const profiles = await Profile.find(filter)
-      .select("name age gender branch course year bio preference profilePic morePics interests coverImage")
+      .select(
+        "name age gender course year bio preference profilePic morePics interests coverImage",
+      )
       .populate("user", "email emailDomain privacy");
 
     res.json(profiles);
@@ -311,7 +312,6 @@ router.put("/privacy", protect, async (req, res) => {
     res.status(500).json({ error: "Failed to update privacy" });
   }
 });
-
 
 /* =======================================================
    GET profile by userId
@@ -336,8 +336,7 @@ router.get("/user/:userId", protect, async (req, res) => {
 router.get("/:id", protect, async (req, res) => {
   try {
     const profile = await Profile.findById(req.params.id);
-    if (!profile)
-      return res.status(404).json({ error: "Profile not found" });
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
 
     res.json(profile);
   } catch (err) {
@@ -359,25 +358,27 @@ router.put(
   async (req, res) => {
     try {
       const profile = await Profile.findById(req.params.id);
-      if (!profile)
-        return res.status(404).json({ error: "Profile not found" });
+      if (!profile) return res.status(404).json({ error: "Profile not found" });
 
       if (profile.user.toString() !== req.user._id.toString())
         return res.status(403).json({ error: "Unauthorized" });
 
       // Update text fields
       const fields = [
-        "name",
-        "age",
-        "gender",
-        "bio",
-        "preference",
-        "location",
-        "branch",
-        "course",
-        "year",
-      ];
+  "name",
+  "age",
+  "gender",
+  "bio",
+  "preference",
+  "course",
+  "year",
+];
 
+if (req.body.location != null) {
+  profile.location = {
+    city: req.body.location,
+  };
+}
       fields.forEach((f) => {
         if (req.body[f] != null) profile[f] = req.body[f];
       });
@@ -404,7 +405,7 @@ router.put(
 
         const up = await callUploadBuffer(
           req.files.coverImage[0].buffer,
-          "amora/covers"
+          "amora/covers",
         );
         profile.coverImage = up.secure_url || up.url;
         profile.coverImagePublicId = up.public_id || up.publicId || null;
@@ -419,7 +420,7 @@ router.put(
 
         const up = await callUploadBuffer(
           req.files.profilePic[0].buffer,
-          "amora/profilePics"
+          "amora/profilePics",
         );
 
         profile.profilePic = up.secure_url || up.url;
@@ -428,7 +429,13 @@ router.put(
 
       // More pics update
       let existingPics =
-        req.body["existingMorePics[]"] || req.body.existingMorePics || [];
+        req.body["existingMorePics[]"] || req.body.existingMorePics;
+
+      // 🔥 if frontend didn't send anything → keep old photos
+      if (existingPics == null) {
+        existingPics = profile.morePics;
+      }
+
       if (!Array.isArray(existingPics))
         existingPics = existingPics ? [existingPics] : [];
 
@@ -456,8 +463,8 @@ router.put(
       if (req.files?.morePics?.length) {
         const uploads = await Promise.all(
           req.files.morePics.map((f) =>
-            callUploadBuffer(f.buffer, "amora/morePics")
-          )
+            callUploadBuffer(f.buffer, "amora/morePics"),
+          ),
         );
 
         uploads.forEach((u) => {
@@ -493,9 +500,31 @@ router.put(
 
       res.json(profile);
     } catch (err) {
-      res.status(500).json({ error: err.message || "Server error updating profile" });
+      res
+        .status(500)
+        .json({ error: err.message || "Server error updating profile" });
     }
-  }
+  },
 );
+
+router.put("/update-location", protect, async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+
+    await Profile.findOneAndUpdate(
+      { user: req.user._id },
+      {
+        currentLocation: {
+          type: "Point",
+          coordinates: [lng, lat],
+        },
+      },
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed updating location" });
+  }
+});
 
 module.exports = router;

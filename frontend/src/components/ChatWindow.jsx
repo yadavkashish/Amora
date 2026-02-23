@@ -213,9 +213,9 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
             />
 
             {/* Online indicator placeholder */}
-            {!IAmBlocked && (
+            {/* {!IAmBlocked && (
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full"></div>
-            )}
+            )} */}
           </div>
 
           <div>
@@ -223,9 +223,9 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
               {selectedUser.isDeleted ? "Deleted Account" : selectedUser.name}
             </h2>
             {/* Hide online status if they blocked me */}
-            {!selectedUser.isDeleted && !IAmBlocked && (
+            {/* {!selectedUser.isDeleted && !IAmBlocked && (
               <p className="text-zinc-500 text-xs">Online</p>
-            )}
+            )} */}
           </div>
         </div>
 

@@ -239,17 +239,31 @@ router.get("/match/:user1Id/:user2Id", protect, async (req, res) => {
 // GET: Get all matches for current user (sorted by compatibility)
 // ✨ FIXED + OPTIMIZED VERSION ✨
 // ============================================================================
+// ============================================================================
+// GET: Get all matches for current user (sorted by compatibility)
+// FULL SAFE VERSION (Geo + Privacy + Compatibility)
+// ============================================================================
 router.get("/all-matches", protect, async (req, res) => {
   try {
     console.log("🔍 Fetching all matches for user:", req.user._id);
 
     const userId = req.user._id;
 
-    // STEP 1 — Current User
-    const currentUser = await User.findOne({ _id: userId, deleted: false });
-    if (!currentUser) return res.status(404).json({ error: "User not found" });
+    // ------------------------------------------------------------------
+    // STEP 1 — Current User + Profile
+    // ------------------------------------------------------------------
+    const currentUser = await User.findOne({
+      _id: userId,
+      deleted: false,
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
     const premiumUser = isUserPremium(currentUser);
+
+    const myProfile = await Profile.findOne({ user: userId });
 
     console.log("🎯 Current User:", {
       name: currentUser.name,
@@ -258,42 +272,70 @@ router.get("/all-matches", protect, async (req, res) => {
       privacy: currentUser.privacy,
     });
 
+    // ------------------------------------------------------------------
     // STEP 2 — Personality Report
+    // ------------------------------------------------------------------
     const myReport = await PersonalityReport.findOne({ userId });
+
     if (!myReport) {
       return res.status(404).json({
         error: "Please complete personality assessment first",
       });
     }
+
     console.log("🧠 Personality report found");
 
-    // STEP 3 — Opposite Gender Filter
+    // ------------------------------------------------------------------
+    // STEP 3 — Gender Filter
+    // ------------------------------------------------------------------
     const genderFilter = getOppositeGenderFilter(currentUser.gender);
 
-    // STEP 4 — Domain Visibility Logic
-    const isGmail = currentUser.emailDomain === "gmail.com";
-    const userDomain = currentUser.emailDomain;
-    const isPublic = currentUser.privacy === "public";
+    // ------------------------------------------------------------------
+    // STEP 4 — Domain / Privacy Visibility Logic
+    // ------------------------------------------------------------------
+   const isGmail = currentUser.emailDomain === "gmail.com";
+const userDomain = currentUser.emailDomain;
+
+// ⭐ IMPORTANT FIX
+// Gmail users are ALWAYS public
+const effectivePrivacy = isGmail
+  ? "public"
+  : currentUser.privacy;
+
+const isPublic = effectivePrivacy === "public";
 
     let domainMatchCondition = {};
 
-    if (isGmail) {
-      if (isPublic)
-        domainMatchCondition = {
-          $or: [{ privacy: "public" }, { emailDomain: "gmail.com" }],
-        };
-      else domainMatchCondition = { emailDomain: "gmail.com" };
-    } else {
-      if (isPublic)
-        domainMatchCondition = {
-          $or: [{ emailDomain: userDomain }, { privacy: "public" }],
-        };
-      else domainMatchCondition = { emailDomain: userDomain };
-    }
+if (isGmail) {
+  // Gmail users always behave as public
+  domainMatchCondition = {
+    $or: [
+      { privacy: "public" },
+      { emailDomain: "gmail.com" },
+    ],
+  };
+} else {
+  if (isPublic) {
+    // Public college user
+    domainMatchCondition = {
+      $or: [
+        { privacy: "public" },
+        { emailDomain: userDomain },
+      ],
+    };
+  } else {
+    // Private college user
+    domainMatchCondition = {
+      emailDomain: userDomain,
+    };
+  }
+}
 
-    console.log("🎓 Final domainMatchCondition:", domainMatchCondition);
+    console.log("🎓 Domain condition:", domainMatchCondition);
 
-    // STEP 5 — Fetch All Other Reports
+    // ------------------------------------------------------------------
+    // STEP 5 — Fetch Other Personality Reports
+    // ------------------------------------------------------------------
     let otherReports = await PersonalityReport.find({
       userId: { $ne: userId },
     })
@@ -309,9 +351,7 @@ router.get("/all-matches", protect, async (req, res) => {
       })
       .lean();
 
-    console.log("📌 Found reports:", otherReports.length);
-
-    // Filter out null userId
+    // remove null populated users
     otherReports = otherReports.filter((r) => r.userId !== null);
 
     console.log("📌 Valid reports:", otherReports.length);
@@ -320,48 +360,83 @@ router.get("/all-matches", protect, async (req, res) => {
       return res.json({
         success: true,
         matches: [],
+        isPremium: premiumUser,
         total: 0,
       });
     }
 
-    // STEP 6 — Load Profiles
-    for (let r of otherReports) {
-      const profile = await Profile.findOne({ user: r.userId._id })
-        .select(
-          "name age gender bio profilePic interests branch course year location preference",
-        )
-        .lean();
+    // ------------------------------------------------------------------
+    // STEP 6 — Load Profiles (Geo if available)
+    // ------------------------------------------------------------------
+    const otherUserIds = otherReports.map((r) => r.userId._id);
 
-      r.profile = profile || {
-        name: "Unknown",
-        age: null,
-        gender: "Other",
-        bio: "",
-        profilePic: null,
-        interests: [],
-      };
+    const hasLocation =
+      myProfile?.currentLocation?.coordinates &&
+      myProfile.currentLocation.coordinates.length === 2;
+
+    let profiles = [];
+
+    if (hasLocation) {
+      profiles = await Profile.aggregate([
+        {
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: myProfile.currentLocation.coordinates,
+            },
+            distanceField: "distance",
+            spherical: true,
+            key: "currentLocation",
+            query: {
+              user: { $in: otherUserIds },
+            },
+          },
+        },
+      ]);
+    } else {
+      // fallback if location not available
+      profiles = await Profile.find({
+        user: { $in: otherUserIds },
+      }).lean();
     }
 
-    // STEP 8 — Score Matches
-    const scoredMatches = matcher.scoreAllMatches(
-      myReport.bigFive,
-      otherReports,
-    );
+    // ------------------------------------------------------------------
+    // STEP 7 — Map Profiles to Reports
+    // ------------------------------------------------------------------
+    const profileMap = new Map();
 
-    // ⭐ Attach profile back (fix the crash)
-    scoredMatches.forEach((m) => {
-      const original = otherReports.find(
-        (o) => o.userId._id.toString() === m.userId._id.toString(),
-      );
-      m.profile = original.profile;
+    profiles.forEach((p) => {
+      profileMap.set(p.user.toString(), p);
     });
 
-    // STEP 9 — Format Output
+    otherReports.forEach((r) => {
+      r.profile = profileMap.get(r.userId._id.toString()) || null;
+    });
+
+    // ------------------------------------------------------------------
+    // STEP 8 — Score Matches (Compatibility Engine)
+    // ------------------------------------------------------------------
+    const scoredMatches = matcher.scoreAllMatches(
+      myReport.bigFive,
+      otherReports
+    );
+
+    // attach profile safely
+    scoredMatches.forEach((m) => {
+      const original = otherReports.find(
+        (o) => o.userId._id.toString() === m.userId._id.toString()
+      );
+      m.profile = original?.profile || null;
+    });
+
+    // ------------------------------------------------------------------
+    // STEP 9 — Format Final Response
+    // ------------------------------------------------------------------
     const topMatches = await Promise.all(
       scoredMatches.slice(0, 50).map(async (match, idx) => {
-        const p = match.profile;
+        const p = match.profile || {};
 
-        // ⭐ FIX: compute chat status here
+        // chat status
         let chatStatus = "NONE";
 
         const chatMeta = await Chat.findOne({
@@ -372,13 +447,13 @@ router.get("/all-matches", protect, async (req, res) => {
 
         return {
           userId: match.userId._id.toString(),
+
           name: p.name,
           age: p.age,
           gender: p.gender,
           bio: p.bio,
           profilePic: p.profilePic,
           interests: p.interests || [],
-          branch: p.branch || null,
           course: p.course || null,
           year: p.year || null,
           location: p.location || null,
@@ -387,21 +462,27 @@ router.get("/all-matches", protect, async (req, res) => {
           emailDomain: match.userId.emailDomain,
           privacy: match.userId.privacy,
 
-          chatStatus, // ⭐ NOW VALID
+          // distance in meters (null if no geo)
+          distance: p.distance || null,
+
+          chatStatus,
 
           compatibility: Math.round(match.compatibility),
           strengths: (match.details?.strengthAreas || []).slice(0, 2),
           challenges: (match.details?.challengeAreas || []).slice(0, 2),
 
+          // premium lock logic
           isLocked: !premiumUser && idx >= 2,
         };
-      }),
+      })
     );
 
     console.log("✅ FINAL MATCH COUNT:", topMatches.length);
 
-    // STEP 10 — Send Response
-    res.json({
+    // ------------------------------------------------------------------
+    // STEP 10 — Response
+    // ------------------------------------------------------------------
+    return res.json({
       success: true,
       matches: topMatches,
       isPremium: premiumUser,
@@ -409,7 +490,7 @@ router.get("/all-matches", protect, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error in all-matches:", err);
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to fetch matches: " + err.message,
     });
   }
@@ -490,171 +571,6 @@ router.get("/matches-by-range", protect, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// GET: Get all matches for current user (sorted by compatibility)
-// ============================================================================
-
-router.get("/all-matches", protect, async (req, res) => {
-  try {
-    console.log("🔍 Fetching all matches for user:", req.user._id);
-
-    const userId = req.user._id;
-
-    // Step 1: Get current user
-    const currentUser = await User.findOne({ _id: userId });
-
-    if (!currentUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const premiumUser = isUserPremium(currentUser);
-
-    // Step 2: Get personality report
-    const myReport = await PersonalityReport.findOne({ userId });
-    if (!myReport) {
-      return res.status(404).json({
-        error: "Please complete personality assessment first",
-      });
-    }
-
-    // Step 3: Get opposite gender filter
-    const genderFilter = getOppositeGenderFilter(currentUser.gender);
-
-    // =============================================================
-    // DOMAIN VISIBILITY LOGIC
-    // =============================================================
-    const isGmail = currentUser.emailDomain === "gmail.com";
-    const isPublic = currentUser.privacy === "public";
-    const userDomain = currentUser.emailDomain;
-
-    let domainMatchCondition = {};
-
-    if (isGmail) {
-      if (isPublic) {
-        domainMatchCondition = {
-          $or: [{ privacy: "public" }, { emailDomain: "gmail.com" }],
-        };
-      } else {
-        domainMatchCondition = { emailDomain: "gmail.com" };
-      }
-    } else {
-      if (isPublic) {
-        domainMatchCondition = {
-          $or: [{ emailDomain: userDomain }, { privacy: "public" }],
-        };
-      } else {
-        domainMatchCondition = { emailDomain: userDomain };
-      }
-    }
-
-    console.log("🎓 Final domainMatchCondition:", domainMatchCondition);
-
-    // Step 4: Fetch opposite gender users from allowed domains
-    let otherReports = await PersonalityReport.find({
-      userId: { $ne: userId },
-    })
-      .populate({
-        path: "userId",
-        select: "_id gender emailDomain privacy deleted",
-        model: "User",
-        match: {
-          deleted: false,
-          ...genderFilter,
-          ...domainMatchCondition,
-        },
-      })
-      .lean();
-
-    // Step 5: Remove nulls
-    otherReports = otherReports.filter((r) => r.userId != null);
-
-    if (otherReports.length === 0) {
-      return res.json({
-        success: true,
-        matches: [],
-        total: 0,
-        message: "No matches found",
-      });
-    }
-
-    // Step 6: Load profiles (optional)
-    for (let vr of otherReports) {
-      const p = await Profile.findOne({ user: vr.userId._id }).lean();
-      vr.profile = p || {};
-    }
-
-    // Step 7: Normalize missing profile fields
-    for (let vr of otherReports) {
-      if (!vr.profile) vr.profile = {};
-      vr.profile.name = vr.profile.name || "Unknown";
-      vr.profile.age = vr.profile.age || null;
-      vr.profile.gender = vr.profile.gender || "Other";
-      vr.profile.bio = vr.profile.bio || "";
-      vr.profile.profilePic = vr.profile.profilePic || null;
-      vr.profile.interests = vr.profile.interests || [];
-      vr.profile.branch = vr.profile.branch || "";
-      vr.profile.course = vr.profile.course || "";
-      vr.profile.year = vr.profile.year || null;
-      vr.profile.location = vr.profile.location || "";
-      vr.profile.preference = vr.profile.preference || "Any";
-    }
-
-    // Step 8: Score matches
-    const scoredMatches = matcher.scoreAllMatches(
-      myReport.bigFive,
-      otherReports,
-    );
-
-    // Step 9: Format matches
-    const topMatches = scoredMatches.slice(0, 50).map((match, idx) => {
-      const p = match.profile || {};
-
-      return {
-        userId: match.userId._id.toString(),
-        name: p.name || "Unknown",
-        age: p.age || null,
-        gender: p.gender || null,
-        bio: p.bio || "",
-        profilePic: p.profilePic || null,
-        interests: p.interests || [],
-        branch: p.branch || null,
-        course: p.course || null,
-        year: p.year || null,
-        location: p.location || null,
-        preference: p.preference || "Any",
-
-        // required
-        emailDomain: match.userId.emailDomain,
-        privacy: match.userId.privacy,
-
-        // FIX → always NONE (no ChatRequest system)
-        chatStatus: "NONE",
-
-        compatibility: Math.round(match.compatibility) || 0,
-        category: matcher.categorizeMatch
-          ? matcher.categorizeMatch(match.compatibility)
-          : "Unknown",
-        interpretation: match.interpretation || "Compatible match",
-
-        strengths: (match.details?.strengthAreas || []).slice(0, 2),
-        challenges: (match.details?.challengeAreas || []).slice(0, 2),
-
-        isLocked: !premiumUser && idx >= 2,
-      };
-    });
-
-    res.json({
-      success: true,
-      isPremium: premiumUser,
-      matches: topMatches,
-      total: topMatches.length,
-    });
-  } catch (err) {
-    console.error("❌ Error in all-matches:", err);
-    res.status(500).json({ error: "Failed to fetch matches: " + err.message });
   }
 });
 

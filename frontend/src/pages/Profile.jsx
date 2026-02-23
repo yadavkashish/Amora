@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
 import {
   Heart,
   MapPin,
@@ -32,10 +33,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import UserProfileOptionsModal from "../components/modals/UserProfileOptionsModal";
 
-const API_URL = import.meta.env.DEV
-  ? "http://localhost:5000"
-  : "";
-
+const API_URL = import.meta.env.DEV ? "http://localhost:5000" : "";
 
 // --- UI HELPERS ---
 const Card = ({ children, className = "" }) => (
@@ -60,6 +58,8 @@ const Badge = ({
     {label}
   </span>
 );
+
+const getLocation = (loc) => (typeof loc === "string" ? loc : loc?.city);
 
 // ============================================================================
 // LOADING SKELETON
@@ -89,6 +89,7 @@ const handleBlockUser = async () => {
 // ============================================================================
 const FullscreenImageViewer = ({ images, initialIndex, isOpen, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
+  const [profilePicFile, setProfilePicFile] = useState(null);
 
   useEffect(() => {
     setCurrentIndex(initialIndex || 0);
@@ -192,8 +193,16 @@ const ProfileHeader = ({
     <Card className="relative overflow-visible mb-8">
       {/* Cover Image */}
       <div className="h-48 sm:h-64 w-full relative group">
+        {profile.coverImage ? (
+          <img
+            src={profile.coverImage}
+            alt="Cover"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-r from-violet-900/30 to-blue-900/30" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-gray-900/90 z-10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-violet-900/30 to-blue-900/30 z-0" />
 
         {/* Cover Upload Trigger */}
         <button
@@ -246,21 +255,22 @@ const ProfileHeader = ({
                   {profile.age}
                 </span>
               </h1>
-              <button
-                onClick={() => setShowProfileMenu(true)}
-                className="p-2 hover:bg-white/10 rounded-full"
-              >
-                <MoreHorizontal size={22} className="text-zinc-300" />
-              </button>
 
               <div className="flex items-center gap-2 text-gray-400 mt-1">
                 <MapPin className="w-4 h-4 text-gray-500" />
-                <span>{profile.location || "Location not set"}</span>
+                <span>{profile?.location?.city || "Location not set"}</span>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex gap-3 mt-2 md:mt-0">
+              {/* SETTINGS MENU */}
+              <button
+                onClick={() => setShowProfileMenu(true)}
+                className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 transition"
+              >
+                <MoreHorizontal size={20} className="text-zinc-300" />
+              </button>
               <button
                 onClick={onEditClick}
                 className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-medium border border-gray-700 transition flex items-center gap-2 text-sm"
@@ -302,9 +312,6 @@ const ProfileHeader = ({
             )}
             {profile.course && (
               <Badge icon={GraduationCap} label={profile.course} />
-            )}
-            {profile.branch && (
-              <Badge icon={Briefcase} label={profile.branch} />
             )}
             {profile.year && (
               <Badge icon={BookOpen} label={`Year ${profile.year}`} />
@@ -535,6 +542,7 @@ const InsightsSection = ({ report, navigate }) => {
 // ============================================================================
 const EditProfileModal = ({ profile, isOpen, onClose, onSave, isLoading }) => {
   const [formData, setFormData] = useState(profile || {});
+  const [profilePicFile, setProfilePicFile] = useState(null);
 
   useEffect(() => {
     setFormData(profile || {});
@@ -542,7 +550,7 @@ const EditProfileModal = ({ profile, isOpen, onClose, onSave, isLoading }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(formData, [], []);
+    onSave(formData, [], profilePicFile);
   };
 
   if (!isOpen) return null;
@@ -568,6 +576,17 @@ const EditProfileModal = ({ profile, isOpen, onClose, onSave, isLoading }) => {
 
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
           <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Profile Picture</label>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setProfilePicFile(e.target.files?.[0])}
+                className={inputClass}
+              />
+            </div>
+
             <div>
               <label className={labelClass}>Name</label>
               <input
@@ -612,9 +631,12 @@ const EditProfileModal = ({ profile, isOpen, onClose, onSave, isLoading }) => {
               <label className={labelClass}>Location</label>
               <input
                 type="text"
-                value={formData.location || ""}
+                value={formData?.location?.city || ""}
                 onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
+                  setFormData({
+                    ...formData,
+                    location: { city: e.target.value },
+                  })
                 }
                 className={inputClass}
               />
@@ -687,36 +709,38 @@ function ModernProfilePage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const navigate = useNavigate();
+  const location = useLocation();
+
   // --- Profile Options (three dots) ---
-const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-const handleDeleteAccount = async () => {
-  if (!window.confirm("Are you sure you want to delete your account?")) return;
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to delete your account?"))
+      return;
 
-  try {
-    await fetch(`${BASE_URL}/api/auth/delete-account`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    alert("Account deleted");
-    navigate("/login");
-  } catch (err) {
-    alert("Failed to delete your account.");
-  }
-};
+    try {
+      await fetch(`${BASE_URL}/api/auth/delete-account`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      alert("Account deleted");
+      navigate("/login");
+    } catch (err) {
+      alert("Failed to delete your account.");
+    }
+  };
 
-const handleLogout = async () => {
-  try {
-    await fetch(`${BASE_URL}/api/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-    navigate("/login");
-  } catch (err) {
-    alert("Logout failed.");
-  }
-};
-
+  const handleLogout = async () => {
+    try {
+      await fetch(`${BASE_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      navigate("/login");
+    } catch (err) {
+      alert("Logout failed.");
+    }
+  };
 
   const BASE_URL = API_URL.replace(/\/$/, "");
 
@@ -746,13 +770,13 @@ const handleLogout = async () => {
         const matches = matchesData?.matches || [];
         const avg = matches.length
           ? Math.round(
-              matches.reduce((s, m) => s + m.compatibility, 0) / matches.length
+              matches.reduce((s, m) => s + m.compatibility, 0) / matches.length,
             )
           : 0;
         setStats({
           perfectMatches: matches.filter((m) => m.compatibility >= 80).length,
           greatMatches: matches.filter(
-            (m) => m.compatibility >= 60 && m.compatibility < 80
+            (m) => m.compatibility >= 60 && m.compatibility < 80,
           ).length,
           avgCompatibility: avg,
           totalMatches: matches.length,
@@ -766,20 +790,32 @@ const handleLogout = async () => {
   };
 
   useEffect(() => {
+    if (location.state?.openEdit) {
+      setIsEditing(true);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
     fetchData();
   }, []);
 
-  const handleUpdate = async (updatedFields, newFiles) => {
+  const handleUpdate = async (updatedFields, newFiles, profilePicFile) => {
     setIsSaving(true);
     try {
       const fd = new FormData();
       Object.keys(updatedFields).forEach((key) => {
         if (key === "interests" && Array.isArray(updatedFields[key])) {
           updatedFields[key].forEach((i) => fd.append("interests[]", i));
+        } else if (key === "location") {
+          fd.append("location", updatedFields.location?.city || "");
         } else {
           fd.append(key, updatedFields[key]);
         }
       });
+      if (profilePicFile) {
+        fd.append("profilePic", profilePicFile);
+      }
+
       if (newFiles)
         Array.from(newFiles).forEach((f) => fd.append("morePics", f));
 
