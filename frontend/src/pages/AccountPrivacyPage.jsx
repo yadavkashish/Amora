@@ -2,19 +2,17 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import SettingsSidebar from "../components/SettingsSidebar";
 
-const API_URL = import.meta.env.DEV
-  ? "http://localhost:5000"
-  : "";
-
+const API_URL = import.meta.env.DEV ? "http://localhost:5000" : "";
 
 /* =====================================================
    Toggle Switch (ON = Private)
 ===================================================== */
-function ToggleSwitch({ isOn, onToggle, disableAnimation }) {
+function ToggleSwitch({ isOn, onToggle, disableAnimation, disabled }) {
   return (
     <div
-      onClick={onToggle}
-      className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer
+      onClick={!disabled ? onToggle : undefined}
+      className={`w-12 h-6 flex items-center rounded-full p-1
+        ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
         ${isOn ? "bg-pink-600" : "bg-zinc-600"}`}
     >
       <div
@@ -23,15 +21,18 @@ function ToggleSwitch({ isOn, onToggle, disableAnimation }) {
           ${disableAnimation ? "" : "transition"}
           ${isOn ? "translate-x-6" : "translate-x-0"}
         `}
-      ></div>
+      />
     </div>
   );
 }
+
 
 export default function AccountPrivacyPage() {
   const [privacy, setPrivacy] = useState("private"); // default ON
   const [showModal, setShowModal] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [isGmailUser, setIsGmailUser] = useState(false);
+
 
   /* =====================================================
      Load privacy from backend — prevent animation
@@ -40,8 +41,13 @@ export default function AccountPrivacyPage() {
     axios
       .get(`${API_URL}/api/auth/me`, { withCredentials: true })
       .then((res) => {
-        setPrivacy(res.data.user.privacy || "private");
-        setTimeout(() => setInitialLoad(false), 10); // disables animation
+        const user = res.data.user;
+
+setPrivacy(user.privacy || "private");
+setIsGmailUser(user.emailDomain === "gmail.com");
+
+setTimeout(() => setInitialLoad(false), 10);
+
       })
       .catch(() => setPrivacy("private"));
   }, []);
@@ -50,14 +56,16 @@ export default function AccountPrivacyPage() {
      Toggle Logic
   ===================================================== */
   const handleToggleClick = () => {
-    if (privacy === "private") {
-      // Attempting to go Public (needs modal)
-      setShowModal(true);
-    } else {
-      // Public → Private instantly
-      updatePrivacy("private");
-    }
-  };
+  // ❌ Gmail users cannot go private
+  if (isGmailUser) return;
+
+  if (privacy === "private") {
+    setShowModal(true);
+  } else {
+    updatePrivacy("private");
+  }
+};
+
 
   /* =====================================================
      Update Privacy in Backend
@@ -95,19 +103,35 @@ export default function AccountPrivacyPage() {
           {/* CARD */}
           <div className="bg-white/[0.03] border border-white/10 rounded-2xl shadow-xl p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Private Account</h2>
+              <h2 className="text-xl font-semibold">
+  Private Account
+  {isGmailUser && (
+    <span className="ml-2 text-xs text-zinc-400">(Unavailable for Gmail domain)</span>
+  )}
+</h2>
+
 
               <ToggleSwitch
-                isOn={privacy === "private"}
-                disableAnimation={initialLoad}
-                onToggle={handleToggleClick}
-              />
+  isOn={privacy === "private"}
+  disableAnimation={initialLoad}
+  onToggle={handleToggleClick}
+  disabled={isGmailUser}
+/>
+
             </div>
 
             <p className="text-zinc-400 text-sm leading-relaxed">
+              {isGmailUser && (
+  <div className="mt-3 text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+    Your account cannot be switched to <span className="font-semibold text-white">Private</span>.
+    <br />
+    Only college domain users can enable private mode.
+  </div>
+)}
+
               {privacy === "private"
                 ? "Only students from your college domain will see your profile and appear in your recommendations."
-                : "Your profile becomes visible to Gmail users and students from your domain."}
+                : "Your profile becomes visible to all the users."}
             </p>
           </div>
         </div>
@@ -128,22 +152,36 @@ export default function AccountPrivacyPage() {
             <div className="px-6 py-5 space-y-5 text-zinc-300 text-sm">
               <div className="flex gap-3">
                 <div className="text-pink-400 text-xl">🌐</div>
-                <p>Gmail users + your college domain can view your profile.</p>
+                <p>
+                  Your profile is{" "}
+                  <span className="font-semibold text-white">Public</span>.
+                </p>
               </div>
 
               <div className="flex gap-3">
                 <div className="text-blue-400 text-xl">👀</div>
-                <p>You will appear in wider recommendations.</p>
+                <p>
+                  You appear in wider recommendations when set to{" "}
+                  <span className="font-semibold text-white">Public</span>.
+                </p>
               </div>
 
               <div className="flex gap-3">
                 <div className="text-purple-400 text-xl">🔗</div>
-                <p>Basic details may be visible outside your domain.</p>
+                <p>
+                  Some details are visible when your profile is{" "}
+                  <span className="font-semibold text-white">Public</span>.
+                </p>
               </div>
 
               <div className="flex gap-3">
                 <div className="text-yellow-400 text-xl">⚠️</div>
-                <p>You can switch back to private anytime.</p>
+                <p>
+                  You can switch between{" "}
+                  <span className="font-semibold text-white">Public</span> and{" "}
+                  <span className="font-semibold text-white">Private</span>{" "}
+                  anytime.
+                </p>
               </div>
             </div>
 

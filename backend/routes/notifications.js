@@ -3,19 +3,18 @@ const router = express.Router();
 const Notification = require("../models/Notification");
 const Chat = require("../models/Chat");
 const { protect } = require("../middleware/auth");
+const Profile = require("../models/Profile");
 
 // Protect all
 router.use(protect);
 
-
 router.put("/seen/all", async (req, res) => {
   await Notification.updateMany(
     { user: req.user._id, seen: false },
-    { $set: { seen: true } }
+    { $set: { seen: true } },
   );
   res.json({ success: true });
 });
-
 
 /* ======================================================
    GET ALL NOTIFICATIONS
@@ -23,9 +22,38 @@ router.put("/seen/all", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const list = await Notification.find({ user: req.user._id })
-      .populate("fromUser", "name profilePic")
+      .populate({
+        path: "fromUser",
+        select: "name", // ONLY user fields
+      })
       .populate("chatId", "_id status participants")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // 🔥 get all sender ids
+    const userIds = list
+      .map(n => n.fromUser?._id)
+      .filter(Boolean);
+
+    // 🔥 fetch all profiles in ONE query
+    const profiles = await Profile.find({
+      user: { $in: userIds },
+    })
+      .select("user profilePic")
+      .lean();
+
+    // create fast lookup map
+    const profileMap = new Map(
+      profiles.map(p => [p.user.toString(), p.profilePic])
+    );
+
+    // attach profilePic
+    list.forEach(n => {
+      if (n.fromUser) {
+        n.fromUser.profilePic =
+          profileMap.get(n.fromUser._id.toString()) || "";
+      }
+    });
 
     res.json(list);
   } catch (err) {

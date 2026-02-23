@@ -58,6 +58,14 @@ router.post("/logout", (req, res) => {
 router.put("/privacy", protect, async (req, res) => {
   try {
     const { privacy } = req.body;
+     const user = await User.findById(req.user._id);
+
+    // ❌ Gmail users cannot be private
+    if (user.emailDomain === "gmail.com" && privacy === "private") {
+      return res.status(403).json({
+        error: "Gmail users cannot set private accounts",
+      });
+    }
 
     if (!["public", "private"].includes(privacy)) {
       return res.status(400).json({ error: "Invalid privacy value" });

@@ -1,8 +1,9 @@
-// CompareDialog.jsx
 import React, { useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Zap, Target, Flame, Info, Heart, Sparkles, Award, ShieldCheck, Lightbulb } from "lucide-react";
 
 /* -------------------------
-   Helper utilities
+   RESTORED ORIGINAL LOGIC
    ------------------------- */
 
 function normalizeTraitValue(v) {
@@ -16,6 +17,22 @@ function normalizeTraitValue(v) {
   }
   return null;
 }
+
+// Map of Enneagram Numbers to Names
+const getEnneagramName = (type) => {
+  const names = {
+    1: "The Reformer",
+    2: "The Helper",
+    3: "The Achiever",
+    4: "The Individualist",
+    5: "The Investigator",
+    6: "The Loyalist",
+    7: "The Enthusiast",
+    8: "The Challenger",
+    9: "The Peacemaker"
+  };
+  return names[String(type)] || "Unknown Type";
+};
 
 function getTraitLabel(trait, value) {
   const mid = 50;
@@ -33,29 +50,20 @@ function getTraitLabel(trait, value) {
 
 function suggestionForTrait(trait) {
   const suggestions = {
-    openness:
-      "One of you is more adventurous, the other prefers stability. Balance novelty with comfort—try new things together at a pace you both enjoy.",
-    conscientiousness:
-      "Different organization styles can clash. Agree on shared responsibilities and check in regularly to avoid miscommunication.",
-    extraversion:
-      "One prefers social gatherings, the other quiet time. Respect each other's energy needs and find activities that satisfy both.",
-    agreeableness:
-      "One is more direct, the other more diplomatic. Practice clear, compassionate communication to avoid misunderstandings.",
-    neuroticism:
-      "Different stress responses. Create a safe space to discuss feelings and develop coping strategies together.",
+    openness: "One of you is more adventurous, the other prefers stability. Balance novelty with comfort—try new things together at a pace you both enjoy.",
+    conscientiousness: "Different organization styles can clash. Agree on shared responsibilities and check in regularly to avoid miscommunication.",
+    extraversion: "One prefers social gatherings, the other quiet time. Respect each other's energy needs and find activities that satisfy both.",
+    agreeableness: "One is more direct, the other more diplomatic. Practice clear, compassionate communication to avoid misunderstandings.",
+    neuroticism: "Different stress responses. Create a safe space to discuss feelings and develop coping strategies together.",
   };
   return suggestions[trait] || "Discuss differences openly and find compromises that work for both.";
 }
-
-/* -------------------------
-   Compatibility calculation (same logic you already had)
-   ------------------------- */
 
 function computeDetailedCompatibility(aReport, bReport) {
   if (!aReport || !bReport) {
     return {
       score: null,
-      summary: "Comparison unavailable: one or both users do not have a personality report.",
+      summary: "Comparison unavailable.",
       reasons: [],
       suggestions: [],
       traits: [],
@@ -92,10 +100,7 @@ function computeDetailedCompatibility(aReport, bReport) {
     const compatibility = Math.max(0, 100 - diff * 1.5);
 
     traitComparisons.push({
-      trait: t,
-      a: av,
-      b: bv,
-      diff,
+      trait: t, a: av, b: bv,
       compatibility: Math.round(compatibility),
       aLabel: getTraitLabel(t, av),
       bLabel: getTraitLabel(t, bv),
@@ -131,8 +136,8 @@ function computeDetailedCompatibility(aReport, bReport) {
   if (score >= 85) reasons.push("Exceptional compatibility — you are likely to have a deeply harmonious connection.");
   else if (score >= 70) reasons.push("Strong compatibility — solid foundation with natural understanding.");
   else if (score >= 55) reasons.push("Moderate compatibility — potential for a meaningful connection with effort.");
-  else if (score >= 40) reasons.push("Low compatibility — meaningful connection is possible but requires intentional communication.");
-  else reasons.push("Very different personalities — compatibility requires significant patience and understanding.");
+  else if (score >= 40) reasons.push("Low compatibility — connection is possible but requires intentional work.");
+  else reasons.push("Very different personalities — compatibility requires significant patience.");
 
   traitComparisons.sort((x, y) => x.compatibility - y.compatibility);
   const topMismatches = traitComparisons.slice(0, 2);
@@ -146,7 +151,7 @@ function computeDetailedCompatibility(aReport, bReport) {
 
   if (topMismatches.length > 0) {
     topMismatches.forEach((t) => {
-      reasons.push(`${t.trait.charAt(0).toUpperCase() + t.trait.slice(1)}: ${t.aLabel} vs ${t.bLabel} — potential area for growth.`);
+      reasons.push(`${t.trait.charAt(0).toUpperCase() + t.trait.slice(1)}: ${t.aLabel} vs ${t.bLabel}.`);
       suggestions.push(suggestionForTrait(t.trait));
     });
   }
@@ -155,7 +160,7 @@ function computeDetailedCompatibility(aReport, bReport) {
     if (String(aEnn) === String(bEnn)) reasons.push(`Both are Enneagram type ${aEnn} — shared core motivations.`);
     else {
       reasons.push(`Different Enneagram types (${aEnn} vs ${bEnn}).`);
-      suggestions.push(`As ${aEnn} and ${bEnn}, your core motivations differ. Discuss what drives each of you.`);
+      suggestions.push(`As types ${aEnn} and ${bEnn}, your core motivations differ. Discuss what drives you.`);
     }
   }
 
@@ -164,24 +169,17 @@ function computeDetailedCompatibility(aReport, bReport) {
     suggestions.push("Collaborate using your shared strengths for maximum impact.");
   }
 
-  if (bStrengthsCoversAWeakness.length > 0 || aStrengthsCoversBWeakness.length > 0) {
-    reasons.push("Complementary skills — you balance each other well.");
-    suggestions.push("Lean on each other's strengths to cover areas where you're naturally less inclined.");
-  }
-
   const compatibilityBreakdown = {
     traitAlignement: Math.round(avgDiff > 20 ? 50 - avgDiff : 80 - avgDiff * 1.5),
     enneagramMatch: aEnn && bEnn && String(aEnn) === String(bEnn) ? 90 : 50,
     strengthComplementarity: sharedStrengths.length + bStrengthsCoversAWeakness.length + aStrengthsCoversBWeakness.length > 3 ? 85 : 60,
   };
 
-  const uniqSuggestions = Array.from(new Set(suggestions)).slice(0, 8);
-
   return {
     score: Math.round(score),
     summary: reasons[0],
     reasons,
-    suggestions: uniqSuggestions,
+    suggestions: Array.from(new Set(suggestions)).slice(0, 8),
     traits: traitComparisons,
     enneagrams: { a: aEnn, b: bEnn },
     sharedStrengths,
@@ -191,214 +189,207 @@ function computeDetailedCompatibility(aReport, bReport) {
 }
 
 /* -------------------------
-   CompareDialog component
+   NEW MODERN UI COMPONENT
    ------------------------- */
 
-/**
- * Props:
- *  - open (bool)
- *  - onClose (fn)
- *  - meReport (object)
- *  - otherReport (object)
- *  - compatibilityScore (number | optional)  // score from Dashboard (preferred display)
- */
-export default function CompareDialog({ open, onClose, meReport, otherReport, compatibilityScore = undefined }) {
+export default function CompareDialog({ open, onClose, meReport, otherReport, compatibilityScore }) {
+  const computed = useMemo(() => computeDetailedCompatibility(meReport, otherReport), [meReport, otherReport]);
+  const finalScore = typeof compatibilityScore === "number" ? Math.round(compatibilityScore) : computed.score;
+
   if (!open) return null;
 
-  const computed = useMemo(() => computeDetailedCompatibility(meReport, otherReport), [meReport, otherReport]);
-
-  // finalScore: prefer dashboard compatibilityScore when provided (but we will still show both)
-  const finalScore = typeof compatibilityScore === "number" ? Math.round(compatibilityScore) : computed.score;
-  const computedScore = computed.score;
-
-  const getScoreColor = (score) => {
-    if (score >= 80) return "from-green-400 to-emerald-600";
-    if (score >= 65) return "from-blue-400 to-blue-600";
-    if (score >= 50) return "from-yellow-400 to-orange-600";
-    return "from-red-400 to-red-600";
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto flex flex-col p-6 md:p-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">💕</span>
-            <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">Compatibility</h2>
-              <p className="text-gray-500 text-sm">Personality analysis & suggestions</p>
-            </div>
-          </div>
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/90 backdrop-blur-md" 
+          onClick={onClose}
+        />
 
-          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-900 text-2xl font-bold">✕</button>
-        </div>
-
-        {/* Score Card (main) */}
-        {finalScore !== null && (
-          <div className={`rounded-2xl p-6 mb-4 text-white bg-gradient-to-br ${getScoreColor(finalScore)} shadow-lg`}>
-            <div className="flex items-center justify-between">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="relative bg-[#0b0f1a] border border-gray-800 w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col"
+        >
+          {/* Header */}
+          <div className="p-8 border-b border-gray-800 flex items-center justify-between bg-[#0b0f1a]/50">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-violet-600/20 rounded-2xl">
+                <Zap className="w-6 h-6 text-violet-400" />
+              </div>
               <div>
-                <div className="text-xs font-semibold opacity-90 tracking-wider">COMPATIBILITY SCORE</div>
-                <div className="text-4xl font-bold">{finalScore}%</div>
+                <h2 className="text-2xl font-black text-white">Compatibility Sync</h2>
+                <p className="text-gray-500 text-sm font-bold uppercase tracking-wider">Analysis Comparison</p>
               </div>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-full transition text-gray-400"><X /></button>
+          </div>
 
-              <div className="text-right">
-                <div className="text-lg font-semibold">
-                  {finalScore >= 80 ? "Exceptional Match 🎉" : finalScore >= 65 ? "Strong Connection ✨" : finalScore >= 50 ? "Good Potential 💫" : "Worth Exploring 🌟"}
+          <div className="p-8 overflow-y-auto space-y-10">
+            
+            {/* Main Score Card */}
+            <div className="relative p-10 rounded-[2rem] bg-gradient-to-br from-violet-600/20 to-indigo-600/20 border border-violet-500/20 text-center md:text-left">
+              <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div>
+                  <p className="text-violet-400 text-xs font-black uppercase tracking-[0.2em] mb-2">Sync Probability</p>
+                  <h3 className="text-7xl font-black text-white">{finalScore || 0}%</h3>
                 </div>
-                <div className="text-sm opacity-90 italic mt-1">{computed.summary}</div>
+                <div className="flex-1 max-w-sm">
+                  <h4 className="text-white font-bold text-xl mb-3 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-yellow-400" /> 
+                    {finalScore >= 80 ? "Instant Resonance" : "Strong Foundation"}
+                  </h4>
+                  <p className="text-gray-400 text-sm leading-relaxed font-medium">
+                    {computed.summary}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Dashboard vs Computed badges */}
-            <div className="mt-4 flex items-center gap-3">
-              {typeof compatibilityScore === "number" && (
-                <div className="inline-flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-sm">
-                  <span className="font-semibold">Dashboard</span>
-                  <span className="bg-white/30 px-2 py-0.5 rounded text-xs font-bold">{Math.round(compatibilityScore)}%</span>
-                </div>
-              )}
-
-              {computedScore !== null && (
-                <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-sm">
-                  <span className="text-xs">Computed</span>
-                  <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium">{computedScore}%</span>
-                </div>
-              )}
-
-              <div className="ml-auto text-xs italic text-white/90">
-                {typeof compatibilityScore === "number" ? "Using dashboard score" : "Using computed score"}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Compatibility Breakdown */}
-        <div className="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
-          <h4 className="font-bold mb-3">Compatibility Breakdown</h4>
-          <div className="space-y-3">
-            {Object.entries(computed.compatibilityBreakdown).map(([k, v]) => (
-              <div key={k}>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-gray-700">{k.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase())}</div>
-                  <div className="text-sm font-bold text-gray-800">{v}%</div>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
-                  <div className="h-2 bg-gradient-to-r from-pink-500 to-purple-600" style={{ width: `${Math.max(0, Math.min(100, v))}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Traits, strengths, suggestions (unchanged) */}
-        {computed.traits && computed.traits.length > 0 && (
-          <div className="mb-6">
-            <h4 className="font-bold mb-3">Big Five Trait Comparison</h4>
-            <div className="space-y-3">
-              {computed.traits.map((t) => (
-                <div key={t.trait} className="bg-white rounded-xl p-4 border border-gray-200 hover:shadow-sm transition">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="font-semibold capitalize">{t.trait.replace(/_/g, " ")}</div>
-                    <div className={`px-2 py-1 rounded-full text-xs font-bold ${t.compatibility >= 80 ? "bg-green-100 text-green-800" : t.compatibility >= 60 ? "bg-blue-100 text-blue-800" : t.compatibility >= 40 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}`}>
-                      {t.compatibility}% aligned
+            {/* Trait Comparison Section */}
+            <div className="space-y-6">
+              <h4 className="text-white font-black uppercase tracking-widest text-xs flex items-center gap-2">
+                <Target className="w-4 h-4 text-violet-400" /> Big Five Comparison
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {computed.traits.map(t => (
+                  <div key={t.trait} className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
+                    <div className="flex justify-between items-center text-xs font-black uppercase text-gray-300">
+                      <span>{t.trait.replace(/_/g, " ")}</span>
+                      <span className="text-violet-400">{t.compatibility}% Align</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${t.a}%` }} className="h-full bg-violet-500" />
+                        </div>
+                        <p className="text-[10px] text-gray-400 italic">You: {t.aLabel}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${t.b}%` }} className="h-full bg-fuchsia-500" />
+                        </div>
+                        <p className="text-[10px] text-gray-400 italic">Them: {t.bLabel}</p>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <div className="text-xs text-gray-600 mb-2">You</div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                          <div className="h-2.5 bg-blue-500 rounded-full" style={{ width: `${t.a}%` }} />
-                        </div>
-                        <div className="text-xs font-bold w-8 text-right">{t.a}</div>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">{t.aLabel}</div>
+            {/* Middle Grid: Strengths & Skills */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase tracking-widest text-xs flex items-center gap-2">
+                  <Award className="w-4 h-4 text-emerald-400" /> Shared Strengths
+                </h4>
+                <div className="p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 min-h-[120px]">
+                  {computed.sharedStrengths.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {computed.sharedStrengths.map((s, i) => (
+                        <span key={i} className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-bold capitalize">
+                          {s}
+                        </span>
+                      ))}
                     </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm italic">No shared strengths identified.</p>
+                  )}
+                </div>
+              </div>
 
-                    <div className="text-gray-300 font-bold">vs</div>
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase tracking-widest text-xs flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400" /> Complementary Balance
+                </h4>
+                <div className="p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/10 space-y-3 min-h-[120px]">
+                  {computed.complementaryWeaknesses.bCoversA.map((s, i) => (
+                    <div key={`b-${i}`} className="flex gap-2 items-center text-xs text-indigo-300 font-medium">
+                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" /> They cover: {s}
+                    </div>
+                  ))}
+                  {computed.complementaryWeaknesses.aCoversB.map((s, i) => (
+                    <div key={`a-${i}`} className="flex gap-2 items-center text-xs text-indigo-300 font-medium">
+                       <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400" /> You cover: {s}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-                    <div className="flex-1">
-                      <div className="text-xs text-gray-600 mb-2">Them</div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                          <div className="h-2.5 bg-pink-500 rounded-full" style={{ width: `${t.b}%` }} />
-                        </div>
-                        <div className="text-xs font-bold w-8 text-right">{t.b}</div>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">{t.bLabel}</div>
+            {/* Bottom Grid: Insights & Suggestions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase tracking-widest text-xs flex items-center gap-2">
+                  <Info className="w-4 h-4 text-blue-400" /> Key Insights
+                </h4>
+                <div className="p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10 space-y-3">
+                  {computed.reasons.map((r, i) => (
+                    <div key={i} className="flex gap-3 text-sm text-gray-300 leading-snug">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                      <p className="font-medium">{r}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase tracking-widest text-xs flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-400" /> Actionable Suggestions
+                </h4>
+                <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/10 space-y-3">
+                  {computed.suggestions.map((s, i) => (
+                    <div key={i} className="flex gap-3 text-sm text-gray-300 leading-snug">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+                      <p className="font-medium">{s}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Enneagram Spotlight with Names */}
+            {(computed.enneagrams.a || computed.enneagrams.b) && (
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase tracking-widest text-xs flex items-center gap-2 px-1">
+                  <Flame className="w-4 h-4 text-indigo-400" /> Enneagram Duo
+                </h4>
+                <div className="p-8 rounded-[2rem] bg-indigo-500/10 border border-indigo-500/20 flex flex-col md:flex-row justify-around items-center gap-8">
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-500 font-bold mb-1 tracking-widest">YOU</p>
+                    <div className="flex flex-col items-center">
+                      <p className="text-5xl font-black text-white leading-none">{computed.enneagrams.a || "—"}</p>
+                      <p className="text-xs font-bold text-violet-400 mt-2 uppercase tracking-wide">
+                        {computed.enneagrams.a ? getEnneagramName(computed.enneagrams.a) : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="hidden md:block h-16 w-px bg-white/10" />
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-500 font-bold mb-1 tracking-widest">THEM</p>
+                    <div className="flex flex-col items-center">
+                      <p className="text-5xl font-black text-fuchsia-400 leading-none">{computed.enneagrams.b || "—"}</p>
+                      <p className="text-xs font-bold text-fuchsia-300 mt-2 uppercase tracking-wide">
+                        {computed.enneagrams.b ? getEnneagramName(computed.enneagrams.b) : ""}
+                      </p>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-            <h5 className="font-semibold mb-2">Shared Strengths</h5>
-            {computed.sharedStrengths && computed.sharedStrengths.length > 0 ? (
-              <ul className="list-disc pl-5 text-sm text-green-900">
-                {computed.sharedStrengths.map((s, i) => <li key={i}>{s}</li>)}
-              </ul>
-            ) : <div className="text-sm text-gray-600">No clear shared strengths found.</div>}
-          </div>
-
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-            <h5 className="font-semibold mb-2">Complementary Skills</h5>
-            {(computed.complementaryWeaknesses?.aCoversB?.length > 0 || computed.complementaryWeaknesses?.bCoversA?.length > 0) ? (
-              <div className="space-y-2 text-sm text-blue-900">
-                {computed.complementaryWeaknesses.bCoversA?.map((s, i) => <div key={`b-${i}`}>They cover: {s}</div>)}
-                {computed.complementaryWeaknesses.aCoversB?.map((s, i) => <div key={`a-${i}`}>You cover: {s}</div>)}
               </div>
-            ) : <div className="text-sm text-gray-600">No strong complementary matches identified.</div>}
-          </div>
-        </div>
+            )}
 
-        {computed.enneagrams && (computed.enneagrams.a || computed.enneagrams.b) && (
-          <div className="mb-6 bg-purple-50 rounded-lg p-4 border border-purple-100">
-            <h5 className="font-semibold mb-3">Enneagram</h5>
-            <div className="flex gap-4">
-              <div className="flex-1 text-center bg-white rounded-lg p-3 border border-purple-100">
-                <div className="text-xs text-gray-600">You</div>
-                <div className="text-2xl font-bold text-purple-700">{computed.enneagrams.a || "—"}</div>
-              </div>
-              <div className="flex-1 text-center bg-white rounded-lg p-3 border border-purple-100">
-                <div className="text-xs text-gray-600">Them</div>
-                <div className="text-2xl font-bold text-pink-600">{computed.enneagrams.b || "—"}</div>
-              </div>
-            </div>
           </div>
-        )}
 
-        {computed.reasons && computed.reasons.length > 0 && (
-          <div className="mb-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <h5 className="font-semibold mb-2">Key Insights</h5>
-            <ul className="list-disc pl-5 text-sm">
-              {computed.reasons.map((r, i) => <li key={i}>{r}</li>)}
-            </ul>
+          {/* Footer */}
+          <div className="p-8 border-t border-gray-800 bg-[#0b0f1a]/80 flex justify-end">
+            <button onClick={onClose} className="px-10 py-3 bg-violet-600 hover:bg-violet-500 text-white font-black rounded-2xl shadow-xl transition active:scale-95">
+              Close Analysis
+            </button>
           </div>
-        )}
-
-        {computed.suggestions && computed.suggestions.length > 0 && (
-          <div className="mb-4 bg-pink-50 rounded-lg p-4 border border-pink-100">
-            <h5 className="font-semibold mb-2">Actionable Suggestions</h5>
-            <ul className="list-disc pl-5 text-sm">
-              {computed.suggestions.map((s, i) => <li key={i}>{s}</li>)}
-            </ul>
-          </div>
-        )}
-
-        {/* Close button */}
-        <div className="flex justify-end mt-4 pt-4 border-t border-gray-100">
-          <button onClick={onClose} className="px-5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg text-white font-semibold hover:shadow-lg">
-            Close
-          </button>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 }

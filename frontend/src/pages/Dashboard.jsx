@@ -20,10 +20,7 @@ import {
 import { sendChatRequest } from "../api/chatApi";
 import MatchCard from "../components/MatchCard";
 
-
-const API_URL = import.meta.env.DEV
-  ? "http://localhost:5000"
-  : "";
+const API_URL = import.meta.env.DEV ? "http://localhost:5000" : "";
 
 // --- THEME BACKGROUND (Shared) ---
 const BackgroundGrid = () => (
@@ -257,8 +254,28 @@ export default function DashboardModern() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  // nearby | same-city | all
   const navigate = useNavigate();
   const abortRef = useRef(null);
+
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        axios.put(
+          `${API_URL}/api/profile/update-location`,
+          {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          },
+          { withCredentials: true },
+        );
+      },
+      () => {
+        // user denied location — ignore silently
+      },
+    );
+  }, []);
 
   // ===== FETCH DATA =====
   useEffect(() => {
@@ -266,52 +283,51 @@ export default function DashboardModern() {
     const signal = abortRef.current.signal;
 
     const fetchData = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+      try {
+        setLoading(true);
+        setError(null);
 
-    const [meRes, matchesRes] = await Promise.all([
-      axios.get(`${API_URL}/api/auth/me`, {
-        withCredentials: true,
-        signal,
-      }),
-      axios.get(`${API_URL}/api/compatibility/all-matches`, {
-        withCredentials: true,
-        signal,
-      })
-    ]);
+        const [meRes, matchesRes] = await Promise.all([
+          axios.get(`${API_URL}/api/auth/me`, {
+            withCredentials: true,
+            signal,
+          }),
+          axios.get(`${API_URL}/api/compatibility/all-matches`, {
+            withCredentials: true,
+            signal,
+          }),
+        ]);
 
-    const user = meRes.data?.user;
+        const user = meRes.data?.user;
 
-    if (!user) throw new Error("User not found");
-    if (user.deleted) {
-      navigate("/account-deleted");
-      return;
-    }
+        if (!user) throw new Error("User not found");
+        if (user.deleted) {
+          navigate("/account-deleted");
+          return;
+        }
 
-    setMe(user);
+        setMe(user);
 
-    const payload = matchesRes.data;
-    const rawMatches = Array.isArray(payload)
-      ? payload
-      : payload?.matches || payload?.data || [];
+        const payload = matchesRes.data;
+        const rawMatches = Array.isArray(payload)
+          ? payload
+          : payload?.matches || payload?.data || [];
 
-    const normalized = rawMatches
-      .filter((m) => !m.isDeleted)
-      .map((m) => ({
-        ...m,
-        compatibility: Number(m.compatibility ?? 0),
-        chatStatus: m.chatStatus ?? "NONE",
-      }));
+        const normalized = rawMatches
+          .filter((m) => !m.isDeleted)
+          .map((m) => ({
+            ...m,
+            compatibility: Number(m.compatibility ?? 0),
+            chatStatus: m.chatStatus ?? "NONE",
+          }));
 
-    setMatches(normalized);
-    setLoading(false);
-  } catch (err) {
-    setError(err?.response?.data?.error || "Failed to load dashboard");
-    setLoading(false);
-  }
-};
-
+        setMatches(normalized);
+        setLoading(false);
+      } catch (err) {
+        setError(err?.response?.data?.error || "Failed to load dashboard");
+        setLoading(false);
+      }
+    };
 
     fetchData();
 
@@ -329,6 +345,26 @@ export default function DashboardModern() {
 
     let result = [...matches];
 
+    if (locationFilter === "nearby") {
+      result.sort(
+        (a, b) =>
+          (a.distance ?? Number.MAX_SAFE_INTEGER) -
+          (b.distance ?? Number.MAX_SAFE_INTEGER),
+      );
+    }
+
+    if (locationFilter === "same-city") {
+      result = result.filter((m) => {
+        const a =
+          typeof m.location === "string" ? m.location : m.location?.city;
+
+        const b =
+          typeof me.location === "string" ? me.location : me.location?.city;
+
+        return a?.toLowerCase?.() === b?.toLowerCase?.();
+      });
+    }
+
     // REAL PRIVACY FILTER (must match backend rules)
     if (me.privacy === "private") {
       // Private users → only same-domain
@@ -344,8 +380,6 @@ export default function DashboardModern() {
         return false;
       });
     }
-
-  
 
     // Gender Filter
     const userGender = normalizeGender(me.gender);
@@ -379,7 +413,7 @@ export default function DashboardModern() {
     }
 
     setFilteredMatches(result);
-  }, [matches, me, filter]);
+  }, [matches, me, filter, locationFilter]);
 
   // ===== HANDLERS =====
   const handleViewProfile = (match) => {
@@ -393,27 +427,26 @@ export default function DashboardModern() {
   };
 
   const fetchMatchesData = async () => {
-  const res = await axios.get(`${API_URL}/api/compatibility/all-matches`, {
-    withCredentials: true,
-  });
+    const res = await axios.get(`${API_URL}/api/compatibility/all-matches`, {
+      withCredentials: true,
+    });
 
-  const payload = res.data;
-  const rawMatches = Array.isArray(payload)
+    const payload = res.data;
+    const rawMatches = Array.isArray(payload)
       ? payload
       : Array.isArray(payload?.matches)
         ? payload.matches
         : payload?.data || [];
 
-  const normalized = rawMatches
-    .filter((m) => !m.isDeleted)
-    .map((m) => ({
-      ...m,
-      compatibility: Number(m.compatibility ?? 0),
-    }));
+    const normalized = rawMatches
+      .filter((m) => !m.isDeleted)
+      .map((m) => ({
+        ...m,
+        compatibility: Number(m.compatibility ?? 0),
+      }));
 
-  setMatches(normalized);
-};
-
+    setMatches(normalized);
+  };
 
   const handleSendMessage = (match) => {
     navigate(`/chat/${match.userId}`, { state: { matchName: match.name } });
@@ -487,7 +520,7 @@ export default function DashboardModern() {
             </span>
           </motion.h1>
 
-          <motion.p
+          {/* <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -498,7 +531,7 @@ export default function DashboardModern() {
               {getDomainDisplay(me?.emailDomain)}
             </span>{" "}
             who match your vibe.
-          </motion.p>
+          </motion.p> */}
 
           {/* Filters */}
           <motion.div
@@ -527,21 +560,49 @@ export default function DashboardModern() {
                 icon: Users,
                 color: "text-amber-400",
               },
+              {
+                label: "Nearby",
+                value: "nearby",
+                icon: MapPin,
+              },
+              {
+                label: "Same City",
+                value: "same-city",
+                icon: School,
+              },
             ].map((btn) => (
               <button
                 key={btn.value}
-                onClick={() => setFilter(btn.value)}
+                onClick={() => {
+                  if (btn.value === "nearby" || btn.value === "same-city") {
+                    setLocationFilter(btn.value);
+                  } else {
+                    setFilter(btn.value);
+                  }
+                }}
                 className={`
                   relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border
                   ${
-                    filter === btn.value
+                    (
+                      btn.value === "nearby" || btn.value === "same-city"
+                        ? locationFilter === btn.value
+                        : filter === btn.value
+                    )
                       ? "bg-white/10 border-pink-500/50 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]"
                       : "bg-black/20 border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20"
                   }
                 `}
               >
                 <btn.icon
-                  className={`w-4 h-4 ${filter === btn.value ? btn.color || "text-pink-400" : ""}`}
+                  className={`w-4 h-4 ${
+                    (
+                      btn.value === "nearby" || btn.value === "same-city"
+                        ? locationFilter === btn.value
+                        : filter === btn.value
+                    )
+                      ? btn.color || "text-pink-400"
+                      : ""
+                  }`}
                 />
                 {btn.label}
               </button>
@@ -553,7 +614,7 @@ export default function DashboardModern() {
       {/* --- Main Content Grid --- */}
       <div className="max-w-7xl mx-auto px-6">
         {/* Matches Grid */}
-        <AnimatePresence  initial={false}>
+        <AnimatePresence initial={false}>
           {filteredMatches.length > 0 ? (
             <motion.div
               key="grid"
@@ -589,7 +650,10 @@ export default function DashboardModern() {
                 {getDomainDisplay(me?.emailDomain)} to join.
               </p>
               <button
-                onClick={() => setFilter("all")}
+                onClick={() => {
+                  setFilter("all");
+                  setLocationFilter("all");
+                }}
                 className="text-pink-400 text-sm hover:text-pink-300 font-medium underline underline-offset-4"
               >
                 Reset Filters
@@ -662,14 +726,14 @@ export default function DashboardModern() {
               ))}
             </div>
 
-            <div className="mt-6 flex items-start gap-3 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+            {/* <div className="mt-6 flex items-start gap-3 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
               <Star className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
               <p className="text-indigo-200 text-sm leading-relaxed">
                 <span className="font-bold text-white">Pro Tip:</span> Refine
                 your personality assessment to improve the accuracy of the Vibe
                 Check algorithm. Higher accuracy means better matches.
               </p>
-            </div>
+            </div> */}
           </motion.div>
         )}
       </div>

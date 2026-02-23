@@ -5,11 +5,12 @@ export default function SettingsSidebar() {
   const nav = useNavigate();
   const location = useLocation();
 
-  const items = [
-    { label: "Edit Profile", to: "/settings/profile" },
-    { label: "Blocked Users", to: "/settings" }, // current one
-    { label: "Account Privacy", to: "/settings/privacy" },
-  ];
+ const items = [
+  { label: "Edit Profile", to: "/profile", state: { openEdit: true } },
+  { label: "Blocked Users", to: "/settings" },
+  { label: "Account Privacy", to: "/settings/privacy" },
+];
+
 
   return (
     <aside
@@ -31,7 +32,7 @@ export default function SettingsSidebar() {
         ) : (
           <button
             key={idx}
-            onClick={() => item.to && nav(item.to)}
+            onClick={() => item.to && nav(item.to, { state: item.state })}
             className={`
               flex items-center justify-between w-full
               px-3 py-3 rounded-lg text-left mb-1
