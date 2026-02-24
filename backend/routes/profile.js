@@ -94,32 +94,39 @@ router.post(
       /* -------------------------------------------
          SAVE NEW PROFILE TO DB
          ------------------------------------------- */
-      const profile = new Profile({
-        user: req.user._id,
-        name: req.body.name,
-        age: req.body.age,
-        gender: req.body.gender,
-        bio: req.body.bio,
-        course: req.body.course,
-        year: req.body.year,
-        preference: req.body.preference,
-        location: {
-  city: req.body.location || "",
-},
+      let currentLocation = undefined;
 
-        currentLocation: {
-          type: "Point",
-          coordinates: [Number(req.body.lng), Number(req.body.lat)],
-        },
-        interests,
-        profilePic,
-        profilePicPublicId,
-        morePics,
-        morePicsPublicIds,
-        coverImage,
-        coverImagePublicId,
-      });
+const lat = Number(req.body.lat);
+const lng = Number(req.body.lng);
 
+if (!isNaN(lat) && !isNaN(lng)) {
+  currentLocation = {
+    type: "Point",
+    coordinates: [lng, lat],
+  };
+}
+
+const profile = new Profile({
+  user: req.user._id,
+  name: req.body.name,
+  age: req.body.age,
+  gender: req.body.gender,
+  bio: req.body.bio,
+  course: req.body.course,
+  year: req.body.year,
+  preference: req.body.preference,
+  location: {
+    city: req.body.location || "",
+  },
+  currentLocation, // ← safe
+  interests,
+  profilePic,
+  profilePicPublicId,
+  morePics,
+  morePicsPublicIds,
+  coverImage,
+  coverImagePublicId,
+});
       await profile.save();
 
       /* -------------------------------------------
