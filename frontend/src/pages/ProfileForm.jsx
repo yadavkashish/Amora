@@ -250,7 +250,13 @@ export default function ProfileForm() {
       // append descriptor (so server can save encrypted descriptor to User)
       data.append('profileDescriptor', JSON.stringify(verifiedDescriptor));
 
-      if (gps) {
+    if (
+  gps &&
+  typeof gps.lat === "number" &&
+  typeof gps.lng === "number" &&
+  !isNaN(gps.lat) &&
+  !isNaN(gps.lng)
+) {
   data.append("lat", gps.lat);
   data.append("lng", gps.lng);
 }
