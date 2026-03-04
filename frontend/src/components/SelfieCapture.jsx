@@ -8,10 +8,12 @@ const DEFAULT_MODELS_PATH = `${import.meta.env.BASE_URL}models`;
 /*
 Props:
   onCaptured(descriptorArray)  // called when capture succeeded
+  setProcessing(boolean)       // called to show/hide the global loader
   modelsPath = DEFAULT_MODELS_PATH
 */
 export default function SelfieCapture({
   onCaptured,
+  setProcessing, // <-- Added this so it can talk to the parent's loader
   modelsPath = DEFAULT_MODELS_PATH,
 }) {
   const videoRef = useRef();
@@ -86,29 +88,45 @@ export default function SelfieCapture({
     };
   }, [modelsPath]);
 
-  async function capture() {
+  function capture() {
     setError(null);
     if (!loaded) return setError("Models still loading...");
-    try {
-      const detection = await faceapi
-        .detectSingleFace(
-          videoRef.current,
-          new faceapi.TinyFaceDetectorOptions()
-        )
-        .withFaceLandmarks()
-        .withFaceDescriptor();
 
-      if (!detection) {
-        return setError(
-          "No face detected. Please try again with good lighting and face visible."
-        );
+    // 1. Tell the parent (Signup.jsx) to immediately show the "Scanning Face..." loader
+    if (setProcessing) setProcessing(true);
+
+    // 2. Use setTimeout to pause for 50 milliseconds. 
+    // This gives the browser just enough time to draw the loader on the screen!
+    setTimeout(async () => {
+      try {
+        // 3. Do the heavy face-api math
+        const detection = await faceapi
+          .detectSingleFace(
+            videoRef.current,
+            new faceapi.TinyFaceDetectorOptions()
+          )
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!detection) {
+          if (setProcessing) setProcessing(false); // Turn off loader if it fails
+          return setError(
+            "No face detected. Please try again with good lighting and face visible."
+          );
+        }
+        
+        const descriptor = Array.from(detection.descriptor);
+        
+        // 4. Send the successful data back to the parent.
+        // (The parent will handle turning off the loader once the OTP sends)
+        onCaptured(descriptor);
+
+      } catch (e) {
+        console.error(e);
+        if (setProcessing) setProcessing(false); // Turn off loader on error
+        setError("Error capturing face. Try again.");
       }
-      const descriptor = Array.from(detection.descriptor);
-      onCaptured(descriptor);
-    } catch (e) {
-      console.error(e);
-      setError("Error capturing face. Try again.");
-    }
+    }, 50); // <-- 50ms pause
   }
 
   return (
@@ -124,7 +142,7 @@ export default function SelfieCapture({
         <button
           onClick={capture}
           disabled={!loaded}
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white"
+          className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform"
         >
           Take selfie
         </button>
