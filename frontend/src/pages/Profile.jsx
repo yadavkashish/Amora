@@ -708,11 +708,13 @@ function ModernProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  // --- Profile Options (three dots) ---
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  const BASE_URL = API_URL.replace(/\/$/, "");
 
   const handleDeleteAccount = async () => {
     if (!window.confirm("Are you sure you want to delete your account?"))
@@ -723,10 +725,10 @@ function ModernProfilePage() {
         method: "DELETE",
         credentials: "include",
       });
-      alert("Account deleted");
+
       navigate("/login");
     } catch (err) {
-      alert("Failed to delete your account.");
+      alert("Failed to delete account");
     }
   };
 
@@ -736,17 +738,17 @@ function ModernProfilePage() {
         method: "POST",
         credentials: "include",
       });
+
       navigate("/login");
     } catch (err) {
-      alert("Logout failed.");
+      alert("Logout failed");
     }
   };
-
-  const BASE_URL = API_URL.replace(/\/$/, "");
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
+
       const [profileRes, reportRes, matchesRes] = await Promise.all([
         fetch(`${BASE_URL}/api/profile/latest`, { credentials: "include" }),
         fetch(`${BASE_URL}/api/personality/my-report`, {
@@ -757,37 +759,60 @@ function ModernProfilePage() {
         }).catch(() => null),
       ]);
 
-      if (!profileRes.ok) throw new Error("Failed to fetch profile");
-      setProfile(await profileRes.json());
+      // Handle profile response
+      if (profileRes.status === 404) {
+        setProfile(null);
+      } else if (profileRes.ok) {
+        const data = await profileRes.json();
+        setProfile(data);
+      } else {
+        throw new Error("Failed to fetch profile");
+      }
 
+      // Personality report
       if (reportRes.ok) {
         const data = await reportRes.json();
         setReport(data?.report || null);
       }
 
+      // Compatibility stats
       if (matchesRes && matchesRes.ok) {
         const matchesData = await matchesRes.json();
         const matches = matchesData?.matches || [];
+
         const avg = matches.length
           ? Math.round(
-              matches.reduce((s, m) => s + m.compatibility, 0) / matches.length,
+              matches.reduce((sum, m) => sum + m.compatibility, 0) /
+                matches.length
             )
           : 0;
+
         setStats({
           perfectMatches: matches.filter((m) => m.compatibility >= 80).length,
           greatMatches: matches.filter(
-            (m) => m.compatibility >= 60 && m.compatibility < 80,
+            (m) => m.compatibility >= 60 && m.compatibility < 80
           ).length,
           avgCompatibility: avg,
           totalMatches: matches.length,
         });
       }
     } catch (err) {
-      console.error(err);
+      console.error("Profile fetch error:", err);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Redirect if profile does not exist
+  useEffect(() => {
+    if (!isLoading && profile === null) {
+      navigate("/profileform");
+    }
+  }, [profile, isLoading, navigate]);
 
   useEffect(() => {
     if (location.state?.openEdit) {
@@ -795,14 +820,12 @@ function ModernProfilePage() {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const handleUpdate = async (updatedFields, newFiles, profilePicFile) => {
     setIsSaving(true);
+
     try {
       const fd = new FormData();
+
       Object.keys(updatedFields).forEach((key) => {
         if (key === "interests" && Array.isArray(updatedFields[key])) {
           updatedFields[key].forEach((i) => fd.append("interests[]", i));
@@ -812,23 +835,27 @@ function ModernProfilePage() {
           fd.append(key, updatedFields[key]);
         }
       });
+
       if (profilePicFile) {
         fd.append("profilePic", profilePicFile);
       }
 
-      if (newFiles)
+      if (newFiles) {
         Array.from(newFiles).forEach((f) => fd.append("morePics", f));
+      }
 
       const res = await fetch(`${BASE_URL}/api/profile/${profile._id}`, {
         method: "PUT",
         body: fd,
         credentials: "include",
       });
+
       if (!res.ok) throw new Error();
+
       await fetchData();
       setIsEditing(false);
-    } catch (e) {
-      alert("Error saving");
+    } catch (err) {
+      alert("Error saving profile");
     } finally {
       setIsSaving(false);
     }
@@ -836,25 +863,31 @@ function ModernProfilePage() {
 
   const handlePhotoUpload = async (files) => {
     if (!files?.length) return;
+
     const fd = new FormData();
     Array.from(files).forEach((f) => fd.append("morePics", f));
+
     await fetch(`${BASE_URL}/api/profile/${profile._id}/photos`, {
       method: "POST",
       body: fd,
       credentials: "include",
     });
+
     fetchData();
   };
 
   const handleCoverUpload = async (file) => {
     if (!file) return;
+
     const fd = new FormData();
     fd.append("coverImage", file);
+
     await fetch(`${BASE_URL}/api/profile/${profile._id}/cover`, {
       method: "PUT",
       body: fd,
       credentials: "include",
     });
+
     fetchData();
   };
 
@@ -862,28 +895,18 @@ function ModernProfilePage() {
     ? [profile.profilePic, ...(profile.morePics || [])].filter(Boolean)
     : [];
 
-  if (isLoading)
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-950 pt-24">
         <LoadingSkeleton />
       </div>
     );
-  if (!profile)
-    return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-        No Profile Found
-      </div>
-    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 pb-20 pt-24">
-      {/* Ambient Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-violet-900/10 blur-[120px] rounded-full" />
-        <div className="absolute top-[20%] right-[0%] w-[40%] h-[40%] bg-blue-900/10 blur-[120px] rounded-full" />
-      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
         <ProfileHeader
           profile={profile}
           onEditClick={() => setIsEditing(true)}
@@ -898,6 +921,7 @@ function ModernProfilePage() {
           handleDeleteAccount={handleDeleteAccount}
           handleLogout={handleLogout}
         />
+
         <UserProfileOptionsModal
           open={showProfileMenu}
           onClose={() => setShowProfileMenu(false)}
@@ -907,15 +931,12 @@ function ModernProfilePage() {
 
         <StatsSection stats={stats} />
 
-        {/* Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Personality & Strengths */}
-          <div className="lg:col-span-1 h-full">
+          <div className="lg:col-span-1">
             <InsightsSection report={report} navigate={navigate} />
           </div>
 
-          {/* Right Column: Gallery (Takes up more space) */}
-          <div className="lg:col-span-2 h-full">
+          <div className="lg:col-span-2">
             <PhotoGrid
               images={allImages}
               onPhotoClick={(idx) => {
@@ -927,7 +948,6 @@ function ModernProfilePage() {
         </div>
       </div>
 
-      {/* Modals */}
       <AnimatePresence>
         <FullscreenImageViewer
           images={allImages}
