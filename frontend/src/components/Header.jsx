@@ -263,9 +263,7 @@ export default function Header() {
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           {/* LOGO */}
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:rotate-12 transition">
-              <Sparkles className="text-white w-5 h-5" />
-            </div>
+            
             <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-purple-200">
               AMORA
             </h1>

@@ -36,8 +36,10 @@ import UserProfileOptionsModal from "../components/modals/UserProfileOptionsModa
 const API_URL = import.meta.env.DEV ? "http://localhost:5000" : "";
 
 // --- UI HELPERS ---
-const Card = ({ children, className = "" }) => (
+// UPDATED: Added onClick to the Card component props
+const Card = ({ children, className = "", onClick }) => (
   <motion.div
+    onClick={onClick}
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     className={`bg-gray-900/60 backdrop-blur-md border border-gray-800 rounded-2xl overflow-hidden shadow-xl ${className}`}
@@ -185,7 +187,6 @@ const ProfileHeader = ({
 }) => {
   const coverInputRef = useRef(null);
   const fileInputRef = useRef(null);
-  // --- Profile More Options (three dots) ---
 
   if (!profile) return null;
 
@@ -335,7 +336,8 @@ const ProfileHeader = ({
 // ============================================================================
 // STATS GRID
 // ============================================================================
-const StatsSection = ({ stats }) => {
+// UPDATED: Destructured navigate from props
+const StatsSection = ({ stats, navigate }) => {
   const items = [
     {
       label: "Perfect Matches",
@@ -343,6 +345,7 @@ const StatsSection = ({ stats }) => {
       icon: Flame,
       color: "text-rose-500",
       bg: "bg-rose-500/10",
+      onClick: () => navigate("/dashboard"), // Added redirect
     },
     {
       label: "Great Matches",
@@ -350,6 +353,7 @@ const StatsSection = ({ stats }) => {
       icon: Zap,
       color: "text-amber-500",
       bg: "bg-amber-500/10",
+      onClick: () => navigate("/dashboard"), // Added redirect
     },
     {
       label: "Total Matches",
@@ -357,6 +361,7 @@ const StatsSection = ({ stats }) => {
       icon: Users,
       color: "text-violet-500",
       bg: "bg-violet-500/10",
+      onClick: () => navigate("/dashboard"), // Added redirect
     },
     {
       label: "Compatibility",
@@ -372,7 +377,11 @@ const StatsSection = ({ stats }) => {
       {items.map((item, idx) => (
         <Card
           key={idx}
-          className="p-5 flex items-center gap-4 hover:border-gray-700 transition-colors"
+          onClick={item.onClick}
+          // UPDATED: Added cursor-pointer class conditionally based on onClick
+          className={`p-5 flex items-center gap-4 transition-colors ${
+            item.onClick ? "cursor-pointer hover:bg-gray-800/80 hover:border-gray-600" : "hover:border-gray-700"
+          }`}
         >
           <div className={`p-3 rounded-xl ${item.bg} ${item.color}`}>
             <item.icon className="w-6 h-6" />
@@ -929,7 +938,8 @@ function ModernProfilePage() {
           onLogout={handleLogout}
         />
 
-        <StatsSection stats={stats} />
+        {/* UPDATED: Passed navigate to StatsSection */}
+        <StatsSection stats={stats} navigate={navigate} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
