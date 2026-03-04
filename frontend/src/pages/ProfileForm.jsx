@@ -7,6 +7,22 @@ import { Heart, User, BookOpen, Camera, Send, CheckCircle, Loader, AlertCircle, 
 import * as faceapi from 'face-api.js';
 import Select from "react-select";
 import { City } from "country-state-city";
+import imageCompression from "browser-image-compression";
+// --- Image Compression ---
+async function compressImage(file) {
+  const options = {
+    maxSizeMB: 1,
+    maxWidthOrHeight: 1280,
+    useWebWorker: true
+  };
+
+  try {
+    return await imageCompression(file, options);
+  } catch (err) {
+    console.error("Compression failed:", err);
+    return file;
+  }
+}
 
 const API_URL = import.meta.env.DEV
   ? "http://localhost:5000"
@@ -134,8 +150,17 @@ export default function ProfileForm() {
     setProfilePreviewUrl(null);
   }
 
-  const handleProfilePicSelected = async (file) => {
-    if (!file) return;
+ const handleProfilePicSelected = async (file) => {
+  if (!file) return;
+
+  // Prevent huge uploads
+  if (file.size > 10 * 1024 * 1024) {
+    alert("Image too large. Please upload a photo under 10MB.");
+    return;
+  }
+
+  // Compress image before verification
+  const compressedFile = await compressImage(file);
     // reset previous verification state & descriptor
     setVerifyState(null);
     setVerifyDist(null);
@@ -151,7 +176,7 @@ export default function ProfileForm() {
     setVerifyState('checking');
 
     try {
-      const img = await loadImageFromFile(file);
+     const img = await loadImageFromFile(compressedFile);
       const detection = await faceapi
         .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
@@ -195,11 +220,11 @@ export default function ProfileForm() {
         setVerifiedDescriptor(descriptorArray);
 
         // set preview (and keep a ref to revoke later)
-        const objUrl = URL.createObjectURL(file);
+       const objUrl = URL.createObjectURL(compressedFile);
         profilePreviewRef.current = objUrl;
         setProfilePreviewUrl(objUrl);
 
-        setProfilePicFile(file);
+       setProfilePicFile(compressedFile);
         setVerifyState('matched');
       } else {
         setVerifyState('not_matched');
@@ -217,9 +242,16 @@ export default function ProfileForm() {
   const handleFileChange = (e, type) => {
     if (type === 'profilePic') {
       handleProfilePicSelected(e.target.files[0]);
-    } else if (type === 'morePics') {
-      setMorePicsFiles(Array.from(e.target.files).slice(0, 5));
-    }
+   } else if (type === 'morePics') {
+
+  const files = Array.from(e.target.files).slice(0, 5);
+
+  Promise.all(files.map(f => compressImage(f)))
+    .then((compressed) => {
+      setMorePicsFiles(compressed);
+    });
+
+}
   };
 
   const handleSubmit = async (e) => {
