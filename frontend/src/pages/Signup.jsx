@@ -154,7 +154,7 @@ const Signup = () => {
             <span className="text-pink-500">{step === "signup" ? "Vibe ID" : step === "selfie" ? "ID" : "Email"}</span>
           </h1>
           <p className="text-slate-400 text-sm">
-            {step === "signup" ? "Join your campus circle by using your campus email." : "Secure your community presence."}
+            {step === "signup" ? "Join your campus circle or connect globally." : "Secure your community presence."}
           </p>
         </div>
 
@@ -176,19 +176,20 @@ const Signup = () => {
                 </div>
               </div>
 
+              {/* UPDATED EMAIL SECTION */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">Campus Email ID</label>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400 ml-1">Campus Mail / Gmail</label>
                 <div className="relative group">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" size={16} />
                   <input
                     type="email" required value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="student@yourcollege.edu"
+                    placeholder="student@college.edu or @gmail.com"
                     className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
                 <p className="text-[10px] text-slate-500 italic mt-1 px-1">
-                  Note: Use your official campus email ID to match with people within your college campus circles.
+                  Note: Use your campus ID to connect within your campus, else use Gmail.
                 </p>
               </div>
 
@@ -280,7 +281,7 @@ const Signup = () => {
                     className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-4 text-center text-xl tracking-[0.5em] font-mono text-white placeholder:text-slate-800 focus:outline-none focus:border-pink-500/50 transition-all"
                   />
                 </div>
-                <p className="text-[10px] text-slate-500">We sent a 6-digit code to your campus email.</p>
+                <p className="text-[10px] text-slate-500">We sent a 6-digit code to your email.</p>
               <SpotlightButton type="submit" disabled={isLoading}>
                 {isLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : "Verify & Activate ID"}
               </SpotlightButton>
@@ -300,7 +301,7 @@ const Signup = () => {
           </p>
           <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
             <ShieldCheck size={14} className="text-pink-500" />
-            Verified Campus Network
+            Verified Network
           </div>
         </div>
       </motion.div>
