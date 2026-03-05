@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import * as faceapi from "face-api.js";
 
-const DEFAULT_MODELS_PATH = `${import.meta.env.BASE_URL}models`;
+const DEFAULT_MODELS_PATH = "/models";
 
 export default function SelfieCapture({ onCaptured, setProcessing, modelsPath = DEFAULT_MODELS_PATH }) {
   const videoRef = useRef();
