@@ -15,21 +15,28 @@ export default function SelfieCapture({ onCaptured, setProcessing, modelsPath = 
   useEffect(() => {
     let mounted = true;
 
-    async function init() {
+   async function init() {
       try {
         const base = modelsPath.replace(/\/$/, "");
+        console.log("1. Starting to load models from:", base);
         
-        // Load only what we strictly need for a smile check
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(`${base}/tiny_face_detector`),
-          faceapi.nets.faceLandmark68Net.loadFromUri(`${base}/face_landmark_68`),
-          faceapi.nets.faceRecognitionNet.loadFromUri(`${base}/face_recognition`),
-          faceapi.nets.faceExpressionNet.loadFromUri(`${base}/face_expression`),
-        ]);
+        await faceapi.nets.tinyFaceDetector.loadFromUri(`${base}/tiny_face_detector`);
+        console.log("2. TinyFaceDetector loaded successfully!");
+        
+        await faceapi.nets.faceLandmark68Net.loadFromUri(`${base}/face_landmark_68`);
+        console.log("3. FaceLandmark68 loaded successfully!");
+        
+        await faceapi.nets.faceRecognitionNet.loadFromUri(`${base}/face_recognition`);
+        console.log("4. FaceRecognition loaded successfully!");
+        
+        // This is usually where it breaks if you are missing files!
+        await faceapi.nets.faceExpressionNet.loadFromUri(`${base}/face_expression`);
+        console.log("5. FaceExpressions loaded successfully!");
 
         if (!mounted) return;
         setLoaded(true);
 
+        console.log("6. Requesting camera access...");
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user" },
           audio: false,
@@ -38,15 +45,16 @@ export default function SelfieCapture({ onCaptured, setProcessing, modelsPath = 
         if (!videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        console.log("7. Camera is live!");
         
-        // Give the camera a second to adjust lighting, then start scanning
         setTimeout(() => {
           setIsReady(true);
           scanForSmile(); 
         }, 1000);
 
       } catch (e) {
-        setError("Camera access required for verification.");
+        console.error("🔥 INITIALIZATION FAILED:", e);
+        setError("System Error: Check your browser console for details.");
       }
     }
     init();
