@@ -1,157 +1,134 @@
-// src/components/SelfieCapture.jsx
 import React, { useRef, useEffect, useState } from "react";
 import * as faceapi from "face-api.js";
 
-// Default base path for models (works with Vite + subpaths)
 const DEFAULT_MODELS_PATH = `${import.meta.env.BASE_URL}models`;
 
-/*
-Props:
-  onCaptured(descriptorArray)  // called when capture succeeded
-  setProcessing(boolean)       // called to show/hide the global loader
-  modelsPath = DEFAULT_MODELS_PATH
-*/
-export default function SelfieCapture({
-  onCaptured,
-  setProcessing, // <-- Added this so it can talk to the parent's loader
-  modelsPath = DEFAULT_MODELS_PATH,
-}) {
+export default function SelfieCapture({ onCaptured, setProcessing, modelsPath = DEFAULT_MODELS_PATH }) {
   const videoRef = useRef();
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
+  const [isReady, setIsReady] = useState(false);
+  
+  // Ref to stop the loop once captured
+  const loopRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
 
     async function init() {
       try {
-        // Base: e.g. "/models"
         const base = modelsPath.replace(/\/$/, "");
-
-        // Subfolders that match your folder structure
-        const tinyPath = `${base}/tiny_face_detector`;
-        const landmarkPath = `${base}/face_landmark_68`;
-        const recogPath = `${base}/face_recognition`;
-
-        console.log("🧠 Loading face-api models from:", {
-          tinyPath,
-          landmarkPath,
-          recogPath,
-        });
-
-        // Optional quick check to catch HTML/404 issues early
-        const testUrl = `${tinyPath}/tiny_face_detector_model-weights_manifest.json`;
-        const res = await fetch(testUrl, { cache: "no-store" });
-        const ct = res.headers.get("content-type") || "";
-        if (!res.ok || !ct.includes("application/json")) {
-          const textSample = await res.text().catch(() => "");
-          throw new Error(
-            `Model manifest fetch failed at ${testUrl}. status=${res.status}, content-type=${ct}, sample="${textSample.slice(
-              0,
-              80
-            )}"`
-          );
-        }
-
-        // Load required models from their subfolders
-        await faceapi.nets.tinyFaceDetector.loadFromUri(tinyPath);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(landmarkPath);
-        await faceapi.nets.faceRecognitionNet.loadFromUri(recogPath);
+        
+        // Load only what we strictly need for a smile check
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(`${base}/tiny_face_detector`),
+          faceapi.nets.faceLandmark68Net.loadFromUri(`${base}/face_landmark_68`),
+          faceapi.nets.faceRecognitionNet.loadFromUri(`${base}/face_recognition`),
+          faceapi.nets.faceExpressionNet.loadFromUri(`${base}/face_expression`),
+        ]);
 
         if (!mounted) return;
-
         setLoaded(true);
 
-        // Start camera
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: { facingMode: "user" },
           audio: false,
         });
+        
         if (!videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        
+        // Give the camera a second to adjust lighting, then start scanning
+        setTimeout(() => {
+          setIsReady(true);
+          scanForSmile(); 
+        }, 1000);
+
       } catch (e) {
-        console.error("SelfieCapture load error:", e);
-        setError(
-          "Cannot load camera or models. Check permissions and models path."
-        );
+        setError("Camera access required for verification.");
       }
     }
-
     init();
 
     return () => {
       mounted = false;
+      cancelAnimationFrame(loopRef.current);
       if (videoRef.current && videoRef.current.srcObject) {
         videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
       }
     };
   }, [modelsPath]);
 
-  function capture() {
-    setError(null);
-    if (!loaded) return setError("Models still loading...");
+  // Continuous background scan (no buttons required!)
+  const scanForSmile = async () => {
+    if (!videoRef.current || videoRef.current.paused) return;
 
-    // 1. Tell the parent (Signup.jsx) to immediately show the "Scanning Face..." loader
-    if (setProcessing) setProcessing(true);
+    const detection = await faceapi
+      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceExpressions()
+      .withFaceDescriptor();
 
-    // 2. Use setTimeout to pause for 50 milliseconds. 
-    // This gives the browser just enough time to draw the loader on the screen!
-    setTimeout(async () => {
-      try {
-        // 3. Do the heavy face-api math
-        const detection = await faceapi
-          .detectSingleFace(
-            videoRef.current,
-            new faceapi.TinyFaceDetectorOptions()
-          )
-          .withFaceLandmarks()
-          .withFaceDescriptor();
+    if (detection) {
+      // Check if they are smiling (70% confidence)
+      const isSmiling = detection.expressions.happy > 0.7;
 
-        if (!detection) {
-          if (setProcessing) setProcessing(false); // Turn off loader if it fails
-          return setError(
-            "No face detected. Please try again with good lighting and face visible."
-          );
-        }
+      if (isSmiling) {
+        // Stop the loop! We got what we need.
+        cancelAnimationFrame(loopRef.current);
+        if (setProcessing) setProcessing(true); // Show global loader
         
-        const descriptor = Array.from(detection.descriptor);
-        
-        // 4. Send the successful data back to the parent.
-        // (The parent will handle turning off the loader once the OTP sends)
-        onCaptured(descriptor);
-
-      } catch (e) {
-        console.error(e);
-        if (setProcessing) setProcessing(false); // Turn off loader on error
-        setError("Error capturing face. Try again.");
+        // Small delay to let the UI catch up, then send the data
+        setTimeout(() => {
+          onCaptured(Array.from(detection.descriptor));
+        }, 300);
+        return; 
       }
-    }, 50); // <-- 50ms pause
-  }
+    }
+
+    // Keep looking at the next frame
+    loopRef.current = requestAnimationFrame(scanForSmile);
+  };
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      {error && <div className="text-red-400 text-sm">{error}</div>}
-      <video
-        ref={videoRef}
-        width={360}
-        height={270}
-        className="rounded-lg bg-black"
-      />
-      <div>
-        <button
-          onClick={capture}
-          disabled={!loaded}
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform"
-        >
-          Take selfie
-        </button>
-      </div>
-      {!loaded && (
-        <div className="text-xs text-zinc-400 mt-2">
-          Loading camera/models…
+    <div className="flex flex-col items-center gap-4 w-full">
+      {error && <div className="text-pink-400 text-xs bg-pink-500/10 p-3 rounded-xl border border-pink-500/20">{error}</div>}
+      
+      <div className="relative w-full max-w-[320px] rounded-full overflow-hidden border-4 border-white/10 aspect-square shadow-2xl shadow-pink-500/10 transition-all duration-500">
+        
+        {/* The Video Feed */}
+        <video 
+          ref={videoRef} 
+          className={`w-full h-full object-cover bg-black scale-x-[-1] transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`} 
+          playsInline 
+          muted 
+        />
+        
+        {/* Sleek UI Overlays */}
+        <div className="absolute inset-0 border-[6px] border-transparent rounded-full pointer-events-none" 
+             style={{ boxShadow: isReady ? 'inset 0 0 20px rgba(236,72,153,0.5)' : 'none' }}>
         </div>
-      )}
+
+        {!loaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-neutral-900">
+             <div className="w-8 h-8 border-2 border-pink-500/30 border-t-pink-500 rounded-full animate-spin"></div>
+          </div>
+        )}
+      </div>
+
+      {/* Instructions that don't look like a button */}
+      <div className="text-center h-12">
+        {loaded ? (
+          <p className="text-sm font-bold uppercase tracking-widest text-pink-400 animate-pulse">
+            Smile to auto-capture 🙂
+          </p>
+        ) : (
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+            Warming up camera...
+          </p>
+        )}
+      </div>
     </div>
   );
 }
