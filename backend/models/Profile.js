@@ -10,7 +10,14 @@ const profileSchema = new mongoose.Schema(
     bio: { type: String, maxlength: 500 },
 
     course: { type: String, required: true },
-    year: { type: Number, enum: [1, 2, 3, 4], required: true },
+    
+    // ✅ Updated: Removed the 1-4 enum and set it to accept full pass-out years
+    year: { 
+      type: Number, 
+      required: true,
+      min: 1950, 
+      max: 2100 
+    },
 
     preference: { type: String, enum: ["Male", "Female", "Other", "Any"], default: "Any" },
     interests: [{ type: String }],
