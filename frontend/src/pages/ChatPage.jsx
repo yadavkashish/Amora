@@ -96,6 +96,7 @@ export default function ChatPage() {
   };
 
   // ================== RENDER ==================
+ // ================== RENDER ==================
   if (!currentUser) {
     return (
       <div className="h-screen flex items-center justify-center text-zinc-400">
@@ -107,7 +108,12 @@ export default function ChatPage() {
   return (
     <div className="h-screen pt-14 flex bg-[#05030a] text-white overflow-hidden">
       {/* ================= LEFT SIDEBAR ================= */}
-      <div className="w-[360px] border-r border-white/10 flex flex-col">
+      {/* UPDATE: Added responsive classes to hide on mobile if a user is selected */}
+      <div 
+        className={`${
+          selectedUser ? "hidden md:flex" : "flex"
+        } w-full md:w-[360px] border-r border-white/10 flex-col`}
+      >
         {/* Tabs */}
         <div className="flex justify-between px-5 mt-4 mb-2">
           <button
@@ -160,7 +166,12 @@ export default function ChatPage() {
       </div>
 
       {/* ================= RIGHT CHAT PANEL ================= */}
-      <div className="flex-1 flex flex-col relative">
+      {/* UPDATE: Added responsive classes to hide on mobile if NO user is selected */}
+      <div 
+        className={`${
+          !selectedUser ? "hidden md:flex" : "flex"
+        } flex-1 flex-col relative`}
+      >
         {!selectedUser ? (
           <div className="flex-1 flex items-center justify-center text-zinc-500">
             Select a chat to start messaging

@@ -6,13 +6,11 @@ import { formatTime } from "../utils/time";
 import { getSocket } from "../utils/socket";
 import {
   FiSend,
-  FiPhone,
-  FiVideo,
   FiMoreVertical,
   FiTrash2,
   FiArrowLeft,
   FiCheck,
-} from "react-icons/fi";
+} from "react-icons/fi"; // Removed FiPhone and FiVideo
 
 export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   const isDeleted = selectedUser?.isDeleted;
@@ -28,14 +26,28 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   const bottomRef = useRef();
   const socket = getSocket();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const API_URL = import.meta.env.DEV
-  ? "http://localhost:5000"
-  : "";
+  const API_URL = import.meta.env.DEV ? "http://localhost:5000" : "";
 
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef(null); // ✅ Added reference for the dropdown menu
+
   const isBlocked = selectedUser.blockedBy === currentUserId;
   const IAmBlocked =
     selectedUser.blockedBy && selectedUser.blockedBy !== currentUserId;
+
+  // ✅ Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // ✅ Resize listener for mobile view
   useEffect(() => {
@@ -103,18 +115,12 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
   // ✅ Listen for new messages in real-time
   useEffect(() => {
     const handleNewMessage = (msg) => {
-      // 🚫 If the message was NOT delivered (blocked), do not show it
       if (msg.delivered === false && msg.receiver === currentUserId) {
         return;
       }
-
-      // 🚫 If THEY blocked me → I shouldn't receive
       if (IAmBlocked) return;
-
-      // 🚫 If I blocked them → I shouldn't receive their messages
       if (isBlocked && msg.sender === selectedUser._id) return;
 
-      // ✅ Normal message flow
       if (
         msg.sender === selectedUser._id ||
         msg.receiver === selectedUser._id
@@ -149,12 +155,9 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
         { withCredentials: true },
       );
 
-      // UI shows YOUR message even if not delivered
       if (res.data.delivered !== false) {
-        // normal delivery
         setMessages((prev) => [...prev, res.data]);
       } else {
-        // message saved but not delivered
         setMessages((prev) => [
           ...prev,
           {
@@ -165,8 +168,6 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
       }
 
       setNewMessage("");
-
-      // ❌ REMOVE socket.emit — backend handles delivery
     } catch (err) {
       console.error("❌ Sending message failed:", err);
     }
@@ -211,77 +212,68 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
               }
               className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-md"
             />
-
-            {/* Online indicator placeholder */}
-            {/* {!IAmBlocked && (
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full"></div>
-            )} */}
           </div>
 
           <div>
             <h2 className="text-white font-bold text-lg leading-tight">
               {selectedUser.isDeleted ? "Deleted Account" : selectedUser.name}
             </h2>
-            {/* Hide online status if they blocked me */}
-            {/* {!selectedUser.isDeleted && !IAmBlocked && (
-              <p className="text-zinc-500 text-xs">Online</p>
-            )} */}
           </div>
         </div>
 
-        <div className="flex gap-4 text-zinc-400">
-          <FiPhone className="cursor-pointer hover:text-pink-400 transition-colors w-5 h-5" />
-          <FiVideo className="cursor-pointer hover:text-pink-400 transition-colors w-5 h-5" />
-          <div className="relative">
-            <FiMoreVertical
-              onClick={() => setShowMenu(!showMenu)}
-              className="cursor-pointer hover:text-pink-400 transition-colors w-5 h-5"
-            />
+        {/* ✅ Improved Options Menu */}
+        <div className="flex gap-2 text-zinc-400">
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu((prev) => !prev)}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <FiMoreVertical
+                className={`w-5 h-5 transition-colors ${showMenu ? "text-pink-400" : "text-zinc-400"}`}
+              />
+            </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-40 bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-2 z-50">
-                {showMenu && (
-                  <div className="absolute right-0 mt-2 w-40 bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-2 z-50">
-                    {/* 🟥 If YOU BLOCKED THEM → show UNBLOCK button */}
-                    {isBlocked && (
-                      <button
-                        onClick={async () => {
-                          await axios.put(
-                            `${API_URL}/api/chat/${selectedUser.chatId}/unblock`,
-                            {},
-                            { withCredentials: true },
-                          );
-                          window.location.reload();
-                        }}
-                        className="w-full text-left px-3 py-2 text-green-400 hover:bg-white/10 rounded-md"
-                      >
-                        Unblock User
-                      </button>
-                    )}
+              <div className="absolute right-0 mt-2 w-44 bg-[#121016] shadow-2xl border border-white/10 rounded-xl overflow-hidden z-50 transition-all origin-top-right">
+                
+                {/* 🟥 If YOU BLOCKED THEM → show UNBLOCK button */}
+                {isBlocked && (
+                  <button
+                    onClick={async () => {
+                      await axios.put(
+                        `${API_URL}/api/chat/${selectedUser.chatId}/unblock`,
+                        {},
+                        { withCredentials: true },
+                      );
+                      window.location.reload();
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm text-green-400 hover:bg-white/5 transition-colors"
+                  >
+                    Unblock User
+                  </button>
+                )}
 
-                    {/* 🟪 If YOU ARE NOT BLOCKED → show BLOCK button */}
-                    {!isBlocked && !IAmBlocked && (
-                      <button
-                        onClick={async () => {
-                          await axios.put(
-                            `${API_URL}/api/chat/${selectedUser.chatId}/block`,
-                            {},
-                            { withCredentials: true },
-                          );
-                          window.location.reload();
-                        }}
-                        className="w-full text-left px-3 py-2 text-red-400 hover:bg-white/10 rounded-md"
-                      >
-                        Block User
-                      </button>
-                    )}
+                {/* 🟪 If YOU ARE NOT BLOCKED → show BLOCK button */}
+                {!isBlocked && !IAmBlocked && (
+                  <button
+                    onClick={async () => {
+                      await axios.put(
+                        `${API_URL}/api/chat/${selectedUser.chatId}/block`,
+                        {},
+                        { withCredentials: true },
+                      );
+                      window.location.reload();
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors"
+                  >
+                    Block User
+                  </button>
+                )}
 
-                    {/* 🔒 If THEY BLOCKED YOU → show disabled info */}
-                    {IAmBlocked && (
-                      <div className="px-3 py-2 text-zinc-500 text-sm">
-                        You cannot modify block settings.
-                      </div>
-                    )}
+                {/* 🔒 If THEY BLOCKED YOU → show disabled info */}
+                {IAmBlocked && (
+                  <div className="px-4 py-3 text-zinc-500 text-xs text-center border-t border-white/5">
+                    You cannot modify block settings.
                   </div>
                 )}
               </div>
@@ -295,7 +287,6 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
         {messages.map((msg, index) => {
           const senderId = msg.sender?.toString() || msg.sender;
           const isSender = senderId === currentUserId?.toString();
-          const isLastMessage = index === messages.length - 1;
 
           return (
             <div
@@ -388,7 +379,6 @@ export default function ChatWindow({ selectedUser, currentUserId, onBack }) {
       transition-all shadow-inner`}
             />
 
-            {/* Hide send button completely for blocker */}
             {!isBlocked && (
               <button
                 type="submit"
