@@ -10,6 +10,7 @@ export default function AccountDeletedPage() {
         >
           Create a new account
         </a>
+       
       </div>
     </div>
   );
