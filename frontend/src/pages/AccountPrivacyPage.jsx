@@ -73,7 +73,7 @@ setTimeout(() => setInitialLoad(false), 10);
   const updatePrivacy = async (newValue) => {
     try {
       await axios.put(
-        `${API_URL}/api/profile/privacy`,
+        `${API_URL}/api/auth/privacy`,
         { privacy: newValue },
         { withCredentials: true },
       );
