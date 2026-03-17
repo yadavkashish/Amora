@@ -27,7 +27,9 @@ import {
 import CompareDialog from "./CompareDialog";
 import ViewProfileOptionsModal from "../components/modals/ViewProfileOptionsModal";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "";
 
 /* ---------- UI HELPERS ---------- */
 const Card = ({ children, className = "" }) => (
