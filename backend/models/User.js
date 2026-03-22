@@ -54,9 +54,14 @@ const userSchema = new mongoose.Schema(
         return domain === "gmail.com" ? "public" : "private";
       },
     },
+    onboardingCompleted: {
+  type: Boolean,
+  default: false,
+}
     
   },
   { timestamps: true },
+  
 );
 
 // extract domain

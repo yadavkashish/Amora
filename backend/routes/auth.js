@@ -102,7 +102,10 @@ router.get("/me", protect, async (req, res) => {
 }
 
 
-  res.json({ user });
+  res.json({ 
+  user,
+  onboardingCompleted: user.onboardingCompleted || false
+});
 });
 
 // ✅ All users from SAME DOMAIN except current user

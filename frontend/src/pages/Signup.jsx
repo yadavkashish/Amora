@@ -69,9 +69,22 @@ const Signup = () => {
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selfieProcessing, setSelfieProcessing] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const navigate = useNavigate();
 
   const startSelfieStep = (e) => {
+    // ✅ OUTER WRAPPER (EASILY REMOVABLE)
+    if (!formData.email.endsWith("@kiet.edu")) {
+      alert("Only KIET college email IDs (@kiet.edu) are allowed for now.");
+      return;
+    }
+
+    // ✅ NEW PRIVACY CHECK (outer wrapper)
+    if (!acceptedPrivacy) {
+      alert("Please accept the Privacy Policy to continue.");
+      return;
+    }
+
     e.preventDefault();
     if (!formData.gender) {
       alert("Please select your gender.");
@@ -132,14 +145,14 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-pink-500/30 flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
-      
+
       {/* Background Glows */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-900/10 blur-[120px] rounded-full" />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-lg relative z-10"
@@ -160,7 +173,7 @@ const Signup = () => {
 
         {/* Form Container */}
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 md:p-10 shadow-2xl shadow-pink-500/5">
-          
+
           {step === "signup" && (
             <form onSubmit={startSelfieStep} className="space-y-5">
               <div className="space-y-1.5">
@@ -213,17 +226,16 @@ const Signup = () => {
                     <button
                       key={opt} type="button"
                       onClick={() => setFormData({ ...formData, gender: opt })}
-                      className={`py-3 rounded-2xl border text-xs font-bold transition-all ${
-                        formData.gender === opt 
-                        ? 'bg-pink-600 border-pink-500 text-white shadow-lg shadow-pink-600/20' 
+                      className={`py-3 rounded-2xl border text-xs font-bold transition-all ${formData.gender === opt
+                        ? 'bg-pink-600 border-pink-500 text-white shadow-lg shadow-pink-600/20'
                         : 'bg-neutral-900/50 border-white/10 text-slate-400 hover:border-white/20'
-                      }`}
+                        }`}
                     >
                       {opt}
                     </button>
                   ))}
                 </div>
-                
+
                 <div className="flex items-start gap-2 bg-pink-500/5 border border-pink-500/20 p-4 rounded-2xl mt-4">
                   <Info className="text-pink-500 shrink-0 mt-0.5" size={14} />
                   <p className="text-[10px] text-pink-300/70 leading-relaxed">
@@ -232,7 +244,27 @@ const Signup = () => {
                 </div>
               </div>
 
-              <SpotlightButton type="submit" className="mt-4">
+              <div className="flex items-start gap-3 mt-2">
+                <input
+                  type="checkbox"
+                  checked={acceptedPrivacy}
+                  onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                  className="mt-1 accent-pink-500"
+                />
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  I agree to the{" "}
+                  <a
+                    href="https://www.amoraonline.in/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-pink-500 underline hover:text-pink-400"
+                  >
+                    Privacy Policy
+                  </a>
+                </p>
+              </div>
+
+              <SpotlightButton type="submit" className="mt-4" disabled={!acceptedPrivacy}>
                 Get Started <ArrowRight size={14} className="ml-1" />
               </SpotlightButton>
             </form>
@@ -247,7 +279,7 @@ const Signup = () => {
                   onCaptured={onSelfieCaptured}
                 />
               </div>
-              
+
               {/* --- VERIFICATION DISCLAIMER --- */}
               <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-start gap-3">
                 <ShieldCheck className="text-pink-500 shrink-0 mt-0.5" size={16} />
@@ -258,9 +290,9 @@ const Signup = () => {
 
               <div className="text-center">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center justify-center gap-2">
-                   <Camera size={12} /> Please look directly into the camera
+                  <Camera size={12} /> Please look directly into the camera
                 </p>
-                <button 
+                <button
                   onClick={() => setStep("signup")}
                   className="mt-6 text-[10px] font-bold uppercase tracking-widest text-pink-500 hover:text-pink-400 border-b border-pink-500/20 pb-0.5 transition-colors"
                 >
@@ -272,20 +304,20 @@ const Signup = () => {
 
           {step === "otp" && (
             <form onSubmit={handleVerifyOtp} className="space-y-6 text-center">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400">Verification Code</label>
-                <div className="relative group max-w-[240px] mx-auto mt-2">
-                  <input
-                    type="text" required maxLength={6} value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="000000"
-                    className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-4 text-center text-xl tracking-[0.5em] font-mono text-white placeholder:text-slate-800 focus:outline-none focus:border-pink-500/50 transition-all"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500">We sent a 6-digit code to your email.</p>
+              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-pink-400">Verification Code</label>
+              <div className="relative group max-w-[240px] mx-auto mt-2">
+                <input
+                  type="text" required maxLength={6} value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="000000"
+                  className="w-full bg-neutral-900/50 border border-white/10 rounded-2xl py-4 text-center text-xl tracking-[0.5em] font-mono text-white placeholder:text-slate-800 focus:outline-none focus:border-pink-500/50 transition-all"
+                />
+              </div>
+              <p className="text-[10px] text-slate-500">We sent a 6-digit code to your email.</p>
               <SpotlightButton type="submit" disabled={isLoading}>
                 {isLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : "Verify & Activate ID"}
               </SpotlightButton>
-              <button 
+              <button
                 type="button" onClick={() => setStep("signup")}
                 className="w-full text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white"
               >

@@ -4,7 +4,9 @@ const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 
 // ✅ Fetch all users from same domain
-router.get('/all', protect, async (req, res) => {
+const onboardingCheck = require("../middleware/onboarding");
+
+router.get('/all', protect, onboardingCheck, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user._id);
     
