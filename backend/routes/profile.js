@@ -153,6 +153,10 @@ router.post(
 
       await profile.save();
 
+      await User.findByIdAndUpdate(req.user._id, {
+  onboardingCompleted: true,
+});
+
       // ---------------- SAVE FACE DESCRIPTOR ----------------
 
       if (req.body.profileDescriptor) {
