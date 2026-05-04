@@ -11,7 +11,7 @@ export default function Footer() {
         {/* LEFT: LEGAL LINKS */}
         <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-500">
           <Link to="/terms" className="hover:text-pink-400 transition-colors">
-            Terms
+            Terms and Conditions
           </Link>
           <Link to="/privacy" className="hover:text-pink-400 transition-colors">
             Privacy
@@ -21,6 +21,9 @@ export default function Footer() {
           </Link>
           <Link to="/contact" className="hover:text-pink-400 transition-colors">
             Contact
+          </Link>
+           <Link to="/refund" className="hover:text-pink-400 transition-colors">
+           Refund and Cancellation
           </Link>
         </div>
 

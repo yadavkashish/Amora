@@ -6,18 +6,19 @@ export default function Terms() {
   const [activeSection, setActiveSection] = useState('');
 
   const sections = [
-    { id: 'introduction', title: '1. Introduction' },
-    { id: 'who-we-are', title: '2. Who We Are' },
-    { id: 'eligibility', title: '3. Eligibility' },
-    { id: 'account-authenticity', title: '4. Account Authenticity' },
-    { id: 'user-conduct', title: '5. User Conduct' },
-    { id: 'compatibility', title: '6. Matching Disclaimer' },
-    { id: 'payments', title: '7. Subscriptions' },
-    { id: 'liability', title: '8. Limitation of Liability' },
+    { id: 'introduction', title: '1. Acceptance of Terms' },
+    { id: 'eligibility', title: '2. Eligibility' },
+    { id: 'definitions', title: '3. Definitions' },
+    { id: 'merchant-rights', title: '4. Merchant Rights' },
+    { id: 'user-responsibilities', title: '5. Your Responsibilities' },
+    { id: 'prohibited-actions', title: '6. Prohibited Actions' },
+    { id: 'liability', title: '7. Limitation of Liability' },
+    { id: 'reviews', title: '8. Reviews Guidelines' },
     { id: 'governing-law', title: '9. Governing Law' },
+    { id: 'grievance', title: '10. Grievance Redressal' },
+    { id: 'disclaimer', title: '11. Disclaimer' },
   ];
 
-  // Optional: Handle scroll highlighting for the sidebar
   useEffect(() => {
     const handleScroll = () => {
       const scrollPosition = window.scrollY + 100;
@@ -33,24 +34,23 @@ export default function Terms() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] text-slate-900 font-sans selection:bg-pink-100">
-      {/* --- Header Section --- */}
-      
-
+    <div className="min-h-screen bg-[#FDFDFD] text-slate-900 font-sans">
       <main className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-12">
-        
-        {/* --- Sidebar Navigation (Desktop) --- */}
+
+        {/* Sidebar */}
         <aside className="hidden lg:block lg:col-span-3 sticky top-32 h-fit">
           <nav className="space-y-1">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Contents</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">
+              Contents
+            </p>
             {sections.map((section) => (
               <a
                 key={section.id}
                 href={`#${section.id}`}
-                className={`block py-2 text-sm transition-all border-l-2 pl-4 ${
-                  activeSection === section.id 
-                  ? 'border-pink-600 text-pink-600 font-semibold' 
-                  : 'border-slate-100 text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                className={`block py-2 text-sm border-l-2 pl-4 ${
+                  activeSection === section.id
+                    ? 'border-pink-600 text-pink-600 font-semibold'
+                    : 'border-slate-100 text-slate-500 hover:border-slate-300'
                 }`}
               >
                 {section.title}
@@ -59,110 +59,113 @@ export default function Terms() {
           </nav>
         </aside>
 
-        {/* --- Main Content --- */}
+        {/* Main Content */}
         <article className="lg:col-span-9 max-w-2xl">
-          <div className="mb-12">
-            <h1 className="text-4xl font-black tracking-tight text-slate-900 mb-4">
-              Terms of Service
-            </h1>
-            <p className="text-slate-500 text-sm">
-              Effective Date: January 9, 2026 | Last Updated: {new Date().toLocaleDateString()}
-            </p>
-          </div>
+          <h1 className="text-4xl font-black mb-6">Terms & Conditions</h1>
 
-          <div className="prose prose-slate prose-pink max-w-none space-y-10">
-            
-            <section id="introduction" className="scroll-mt-32">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">1. Acceptance of Terms</h3>
-              <p className="leading-relaxed text-slate-600">
-                By creating an account or using the AmoraOnline mobile application or website (the "Service"), 
-                you agree to be bound by these Terms of Service. These terms constitute a legally binding 
-                agreement between you and AmoraOnline.
+          <div className="space-y-10 text-slate-600">
+
+            {/* 1 */}
+            <section id="introduction">
+              <h3 className="text-xl font-bold mb-3">1. Acceptance of Terms</h3>
+              <p>
+                By accessing this platform, you agree to be bound by these Terms and Conditions.
+                If you do not agree, you must stop using the platform. We may update these terms at any time.
               </p>
             </section>
 
-            <section id="who-we-are" className="scroll-mt-32 p-6 bg-slate-50 rounded-xl border border-slate-100">
-              <h3 className="text-xl font-bold text-slate-800 mb-2">2. Who We Are</h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                <strong>AmoraOnline</strong> is operated in India. For inquiries regarding data protection 
-                or legal service, please contact:
-              </p>
-              <address className="not-italic mt-3 text-sm text-slate-500 leading-6">
-                AmoraOnline Business Services<br />
-                City Shahjahanpur, Uttar Pradesh<br />
-                PIN: 242001, India<br />
-                Email: <span className="text-pink-600">accounts@amoraonline.in</span>
-              </address>
-            </section>
-
-            <section id="eligibility" className="scroll-mt-32">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">3. Eligibility</h3>
-              <p className="leading-relaxed text-slate-600">
-                You must be at least <strong>18 years of age</strong> to create an account on AmoraOnline. 
-                By using our service, you represent and warrant that you have the right, authority, and capacity 
-                to enter into this agreement.
+            {/* 2 */}
+            <section id="eligibility">
+              <h3 className="text-xl font-bold mb-3">2. Eligibility</h3>
+              <p>
+                You confirm that you have the legal authority to enter into this agreement and fulfill your obligations.
               </p>
             </section>
 
-            <section id="account-authenticity" className="scroll-mt-32">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">4. Account Authenticity</h3>
-              <p className="leading-relaxed text-slate-600">
-                AmoraOnline is built on trust. You agree to:
-              </p>
-              <ul className="list-disc pl-5 mt-3 space-y-2 text-slate-600">
-                <li>Provide accurate, current, and complete information.</li>
-                <li>Upload only photographs of yourself.</li>
-                <li>Not create multiple accounts or use automated tools to scrape data.</li>
+            {/* 3 */}
+            <section id="definitions">
+              <h3 className="text-xl font-bold mb-3">3. Definitions</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><strong>Platform:</strong> Website or app where services are offered</li>
+                <li><strong>Transaction:</strong> Purchase request by the user</li>
+                <li><strong>Transaction Amount:</strong> Amount paid by user</li>
+                <li><strong>Payment Instrument:</strong> UPI, cards, bank, etc.</li>
               </ul>
             </section>
 
-            <section id="user-conduct" className="scroll-mt-32">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">5. User Conduct</h3>
-              <p className="leading-relaxed text-slate-600">
-                Harassment, bullying, or hate speech is strictly prohibited. We maintain a zero-tolerance policy 
-                for scams, commercial solicitation, or the distribution of explicit content without consent.
+            {/* 4 */}
+            <section id="merchant-rights">
+              <h3 className="text-xl font-bold mb-3">4. Merchant Rights</h3>
+              <p>
+                We may collect, store, and use your data to provide services and communicate with you.
               </p>
             </section>
 
-            <section id="compatibility" className="scroll-mt-32">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">6. Matching & Compatibility Disclaimer</h3>
-              <p className="leading-relaxed text-slate-600">
-                While our algorithms aim to connect you with compatible partners, we do not guarantee match 
-                frequency, quality, or successful relationship outcomes. Interactions are at your own discretion.
+            {/* 5 */}
+            <section id="user-responsibilities">
+              <h3 className="text-xl font-bold mb-3">5. Your Responsibilities</h3>
+              <p>
+                You must provide accurate personal and payment information for all transactions.
               </p>
             </section>
 
-            <section id="payments" className="scroll-mt-32 border-l-4 border-pink-500 pl-6 py-2">
-              <h3 className="text-xl font-bold text-slate-800 mb-4 text-pink-700">7. Subscriptions & Payments</h3>
-              <p className="leading-relaxed text-slate-600 font-medium">
-                Certain premium features require payment. Once a transaction is processed, it is 
-                <span className="text-pink-600 underline decoration-pink-200 underline-offset-4 ml-1">non-refundable</span>. 
-                AmoraOnline does not offer pro-rated refunds for cancelled subscriptions.
+            {/* 6 */}
+            <section id="prohibited-actions">
+              <h3 className="text-xl font-bold mb-3">6. Prohibited Actions</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>No hacking, scraping, or misuse of platform</li>
+                <li>No impersonation or fraud</li>
+                <li>No harmful or illegal activities</li>
+                <li>No reverse engineering or system abuse</li>
+              </ul>
+            </section>
+
+            {/* 7 */}
+            <section id="liability">
+              <h3 className="text-xl font-bold mb-3">7. Limitation of Liability</h3>
+              <p>
+                We are not responsible for losses, damages, or defective services beyond refund policies.
               </p>
             </section>
 
-            <section id="liability" className="scroll-mt-32">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">8. Limitation of Liability</h3>
-              <p className="leading-relaxed text-slate-600">
-                To the maximum extent permitted by law, AmoraOnline shall not be liable for any indirect, 
-                incidental, or punitive damages, or any loss of data, use, or goodwill resulting from your access 
-                to or use of the service.
+            {/* 8 */}
+            <section id="reviews">
+              <h3 className="text-xl font-bold mb-3">8. Reviews Guidelines</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>No offensive or false content</li>
+                <li>No fake or misleading reviews</li>
+                <li>We may remove reviews at our discretion</li>
+              </ul>
+            </section>
+
+            {/* 9 */}
+            <section id="governing-law">
+              <h3 className="text-xl font-bold mb-3">9. Governing Law</h3>
+              <p>
+                These terms are governed by Indian law. Disputes will be resolved via arbitration in India.
               </p>
             </section>
 
-            <section id="governing-law" className="scroll-mt-32 pb-20">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">9. Governing Law</h3>
-              <p className="leading-relaxed text-slate-600">
-                These terms are governed by the laws of <strong>India</strong>. Any disputes shall be subject 
-                to the exclusive jurisdiction of the courts located in Uttar Pradesh, India.
+            {/* 10 */}
+            <section id="grievance">
+              <h3 className="text-xl font-bold mb-3">10. Grievance Redressal</h3>
+              <p>
+                For complaints such as refunds, fraud, or transaction issues, please contact support.
+              </p>
+            </section>
+
+            {/* 11 */}
+            <section id="disclaimer">
+              <h3 className="text-xl font-bold mb-3">11. Disclaimer</h3>
+              <p>
+                All transactions are at your own risk. We do not guarantee uninterrupted or error-free service.
+                You must keep your account credentials secure.
               </p>
             </section>
 
           </div>
         </article>
       </main>
-
-     
     </div>
   );
 }

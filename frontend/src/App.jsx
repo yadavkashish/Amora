@@ -22,6 +22,7 @@ const Contact = lazy(() => import(/* webpackChunkName: "contact" */ './component
 const Terms = lazy(() => import(/* webpackChunkName: "terms" */ './components/Terms'));
 const Cookies = lazy(() => import(/* webpackChunkName: "cookies" */ './components/Cookies'));
 const Privacy = lazy(() => import(/* webpackChunkName: "privacy" */ './components/Privacy'));
+const RefundPolicy = lazy(() => import(/* webpackChunkName: "privacy" */ './components/RefundPolicy'));
 const PersonalityReportDisplay = lazy(() => import(/* webpackChunkName: "personality-report-display" */ './pages/PersonalityReport'));
 const PersonalityReportPage = lazy(() => import(/* webpackChunkName: "personality-report-page" */ './pages/PersonalityReportPage'));
 
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="/terms" element={<Terms />} />
               <Route path="/cookies" element={<Cookies />} />
               <Route path="/privacy" element={<Privacy />} />
+               <Route path="/refund" element={<RefundPolicy />} />
               <Route path="/personality-report" element={<PersonalityReportDisplay />} />
               <Route path="/personality-report/:userId" element={<PersonalityReportPage />} />
               <Route path="/premium" element={< PaymentPage/>} />
